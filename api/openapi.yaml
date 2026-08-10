@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info:
+  title: VOE LAB Demonstration API
+  version: 1.0.0
+  description: API fictícia, sem conexão com veículos, pessoas ou infraestrutura real.
+servers:
+  - url: https://example.invalid/voe-lab
+    description: Endereço intencionalmente inválido
+paths:
+  /demo/vehicles:
+    get:
+      summary: Lista veículos fictícios
+      operationId: listDemoVehicles
+      responses:
+        "200":
+          description: Frota demonstrativa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DemoVehicle"
+components:
+  schemas:
+    DemoVehicle:
+      type: object
+      required: [id, status, batteryPercent]
+      properties:
+        id:
+          type: string
+          example: VOE-DEMO-01
+        status:
+          type: string
+          enum: [available-demo, maintenance-demo]
+        batteryPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 84
