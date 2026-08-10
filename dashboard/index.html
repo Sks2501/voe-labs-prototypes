@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VOE LAB · Fleet Demo</title>
+  <style>
+    :root{--coral:#ff786a;--ink:#111827;--muted:#64748b;--bg:#f5f7fb;--card:#fff;--green:#22c55e}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+    header{padding:42px max(24px,7vw);background:linear-gradient(135deg,#111827,#263449);color:#fff}
+    header b{color:var(--coral)} main{max-width:1120px;margin:-22px auto 60px;padding:0 20px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+    .card{background:var(--card);border-radius:18px;padding:22px;box-shadow:0 12px 35px #0f172a12}
+    .number{font-size:32px;font-weight:800;margin:8px 0}.muted{color:var(--muted);font-size:14px}
+    table{width:100%;border-collapse:collapse} th,td{padding:15px;text-align:left;border-bottom:1px solid #e5e7eb}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:700}
+    .battery{height:8px;background:#e5e7eb;border-radius:9px;overflow:hidden}.battery i{display:block;height:100%;background:var(--green)}
+    footer{text-align:center;color:var(--muted);padding:24px}
+  </style>
+</head>
+<body>
+  <header><h1>VOE <b>LAB</b></h1><p>Fleet Operations · protótipo com dados fictícios</p></header>
+  <main>
+    <section class="grid" id="metrics"></section>
+    <section class="card" style="margin-top:16px;overflow:auto">
+      <h2>Frota demonstrativa</h2>
+      <table><thead><tr><th>Veículo</th><th>Estado</th><th>Bateria</th><th>Zona</th></tr></thead><tbody id="fleet"></tbody></table>
+    </section>
+  </main>
+  <footer>Nenhum veículo, usuário ou endpoint real é utilizado.</footer>
+  <script>
+    const vehicles=[
+      {id:"VOE-D01",status:"Disponível",battery:92,zone:"Estação Coral"},
+      {id:"VOE-D02",status:"Disponível",battery:76,zone:"Praça Demo"},
+      {id:"VOE-D03",status:"Em inspeção",battery:48,zone:"VOE LAB"},
+      {id:"VOE-D04",status:"Disponível",battery:83,zone:"Estação Azul"}
+    ];
+    const metrics=[
+      ["Veículos fictícios",vehicles.length],
+      ["Disponíveis",vehicles.filter(v=>v.status==="Disponível").length],
+      ["Bateria média",Math.round(vehicles.reduce((a,v)=>a+v.battery,0)/vehicles.length)+"%"],
+      ["Alertas simulados",1]
+    ];
+    document.querySelector("#metrics").innerHTML=metrics.map(([label,value])=>`<article class="card"><div class="muted">${label}</div><div class="number">${value}</div></article>`).join("");
+    document.querySelector("#fleet").innerHTML=vehicles.map(v=>`<tr><td><b>${v.id}</b></td><td><span class="pill">${v.status}</span></td><td><div>${v.battery}%</div><div class="battery"><i style="width:${v.battery}%"></i></div></td><td>${v.zone}</td></tr>`).join("");
+  </script>
+</body>
+</html>
