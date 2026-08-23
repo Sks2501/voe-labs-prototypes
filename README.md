@@ -1,87 +1,101 @@
-# VOE LAB — Protótipos Públicos
+# VOE LAB / Systems Engineering Sandbox
 
-Laboratório aberto com demonstrações independentes e dados totalmente fictícios para explorar experiências de micromobilidade urbana.
+![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-111827?style=flat-square&logo=openapiinitiative)
+![Protocols](https://img.shields.io/badge/protocols-versioned-111827?style=flat-square)
+![Architecture](https://img.shields.io/badge/architecture-failure_oriented-111827?style=flat-square)
+![Data](https://img.shields.io/badge/data-synthetic_only-111827?style=flat-square)
+![Security](https://img.shields.io/badge/security-no_production_secrets-111827?style=flat-square)
 
-![Status](https://img.shields.io/badge/status-protótipos-ff786a?style=for-the-badge)
-![Data](https://img.shields.io/badge/dados-100%25_fictícios-111827?style=for-the-badge)
-![Security](https://img.shields.io/badge/sem_credenciais-público_seguro-22c55e?style=for-the-badge)
-![API](https://img.shields.io/badge/OpenAPI-3.0.3-6BA539?style=for-the-badge&logo=openapiinitiative&logoColor=white)
-![Protocol](https://img.shields.io/badge/protocolo-versionado-2563EB?style=for-the-badge)
+Public systems-engineering laboratory for protocol design, deterministic telemetry contracts, API compatibility, failure semantics and reproducible sandbox tooling.
 
-## Visão geral
+This repository is intentionally designed as a **technical lab**, not a personal profile and not a production control repository.
 
-O repositório reúne protótipos públicos e seguros para demonstrar arquitetura de software aplicada à micromobilidade sem conectar-se a veículos, usuários, servidores de produção ou infraestrutura operacional.
-
-A arquitetura demonstrativa está separada em três superfícies:
+## System model
 
 ```text
-Dashboard estático
-      │
-      ▼
-Public Sandbox API Contract
-      │
-      ▼
-Telemetry Demo Event Contract
-      │
-      ▼
-Simulador local sem acesso a hardware
+┌───────────────────────────────────────────────────────────────┐
+│                       PUBLIC API CONTRACT                     │
+│       OpenAPI · pagination · errors · correlation IDs        │
+└──────────────────────────────┬────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────────────┐
+│                    APPLICATION DATA MODEL                     │
+│       synthetic resources · states · compatibility           │
+└──────────────────────────────┬────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────────────┐
+│                     TELEMETRY ENVELOPES                       │
+│     schema · event identity · sequence · source · time        │
+└──────────────────────────────┬────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────────────┐
+│                      PROTOCOL RESEARCH                        │
+│ framing · validation · bounded parsing · integrity semantics  │
+└──────────────────────────────┬────────────────────────────────┘
+                               │
+                               ▼
+┌───────────────────────────────────────────────────────────────┐
+│                    SYNTHETIC LOCAL TOOLING                    │
+│ deterministic generators · fixtures · diagnostics · tests     │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-## Demonstrações
+## Repository topology
 
-### Painel de frota
-
-Abra `dashboard/index.html` no navegador para visualizar um painel estático com veículos fictícios, níveis simulados de bateria e indicadores operacionais.
-
-### Simulador de telemetria
-
-Execute:
-
-```bash
-node telemetry/simulator.js
+```text
+voe-labs-prototypes/
+├── README.md
+├── SECURITY.md
+├── api/
+│   └── openapi.yaml
+├── dashboard/
+│   └── index.html
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── PROTOCOLS.md
+│   └── RFC-0001-SYNTHETIC-FRAME.md
+└── telemetry/
+    └── simulator.js
 ```
 
-O programa gera eventos locais de localização aproximada, bateria, estado e horário. Ele não se conecta a dispositivos, servidores, APIs, Bluetooth, UART, serial ou veículos reais.
+## Contracts
 
-### Especificação pública da API
+### HTTP surface
 
-O arquivo `api/openapi.yaml` contém a especificação OpenAPI 3.0.3 do sandbox demonstrativo.
+`api/openapi.yaml` defines the public read-only sandbox interface.
 
-A versão 2 inclui contratos somente leitura para:
+Current contract families:
 
-- `GET /v1/status`
-- `GET /v1/vehicles`
-- `GET /v1/vehicles/{vehicleId}`
-- `GET /v1/telemetry/events`
+```text
+GET /v1/status
+GET /v1/vehicles
+GET /v1/vehicles/{vehicleId}
+GET /v1/telemetry/events
+```
 
-A especificação define paginação, envelopes padronizados, erros, `requestId`, rate limiting conceitual, schemas de veículo e contratos de telemetria.
+The contract includes:
 
-### Protocolos públicos
+- explicit API versioning;
+- pagination bounds;
+- deterministic error envelopes;
+- correlation identifiers;
+- strict resource states;
+- bounded query parameters;
+- rate-limit semantics;
+- machine-readable schemas.
 
-A documentação técnica completa está em [`docs/PROTOCOLS.md`](docs/PROTOCOLS.md).
+### Telemetry envelope
 
-Ela descreve:
-
-- arquitetura de contratos públicos;
-- versionamento;
-- modelo de eventos;
-- identidade de recursos;
-- estados demonstrativos;
-- ordenação de telemetria;
-- compatibilidade;
-- observabilidade;
-- threat model;
-- limites explícitos de segurança.
-
-## Contrato de telemetria
-
-Schema atual:
+Current event family:
 
 ```text
 voe.lab.telemetry.demo.v1
 ```
 
-Eventos públicos modelados:
+Defined synthetic observation types:
 
 ```text
 heartbeat.demo
@@ -90,79 +104,139 @@ position.sample.demo
 state.sample.demo
 ```
 
-Exemplo:
-
-```json
-{
-  "schema": "voe.lab.telemetry.demo.v1",
-  "eventId": "evt_demo_000001",
-  "eventType": "battery.sample.demo",
-  "sequence": 42,
-  "vehicleId": "VOE-DEMO-01",
-  "recordedAt": "2026-08-23T06:00:00Z",
-  "source": "local-simulator",
-  "payload": {
-    "batteryPercent": 84,
-    "status": "available-demo",
-    "zone": "Estação Coral",
-    "coordinates": {
-      "latitude": -22.9,
-      "longitude": -43.18,
-      "precision": "synthetic"
-    }
-  }
-}
-```
-
-## Regras de segurança
-
-- somente informações fictícias;
-- nenhuma chave, senha ou token real;
-- arquivos `.env` nunca são enviados;
-- nenhum endpoint de produção;
-- nenhuma informação pessoal de clientes;
-- nenhuma conexão com veículos;
-- nenhuma lógica de desbloqueio;
-- nenhum comando operacional de hardware;
-- nenhum código proprietário obtido de terceiros;
-- identificadores, zonas e coordenadas fictícios.
-
-## Estrutura
+A telemetry event carries independent envelope metadata:
 
 ```text
-voe-labs-prototypes/
-├── README.md
-├── api/
-│   └── openapi.yaml
-├── dashboard/
-│   └── index.html
-├── docs/
-│   └── PROTOCOLS.md
-└── telemetry/
-    └── simulator.js
+schema
+├── eventId
+├── eventType
+├── sequence
+├── vehicleId
+├── recordedAt
+├── source
+└── payload
 ```
 
-## Filosofia de arquitetura
+Sequence numbers exist for ordering diagnostics and duplicate detection. They are not authentication material.
+
+## Architecture documentation
+
+### `docs/ARCHITECTURE.md`
+
+Defines:
+
+- logical system boundaries;
+- failure classes;
+- compatibility rules;
+- data classification;
+- reliability properties;
+- observability requirements;
+- explicit non-goals.
+
+### `docs/PROTOCOLS.md`
+
+Defines:
+
+- protocol families;
+- public resource identity;
+- event semantics;
+- state models;
+- validation expectations;
+- compatibility behavior;
+- threat assumptions.
+
+### `docs/RFC-0001-SYNTHETIC-FRAME.md`
+
+Defines an experimental sandbox-only binary framing model used to discuss:
+
+- fixed-width headers;
+- bounded payloads;
+- explicit versions;
+- deterministic parsing;
+- integrity checks;
+- parser error taxonomy;
+- allocation-free decoding principles.
+
+The RFC intentionally contains **no operational actuation message family**.
+
+## Failure-oriented design
+
+The sandbox treats failure as part of the contract.
 
 ```text
-Publicável
-    +
-Reproduzível
-    +
-Versionado
-    +
-Sem segredos
-    +
-Sem atuação física
-    =
-Sandbox técnico seguro
+invalid input
+    → reject before interpretation
+
+unsupported major version
+    → fail closed
+
+integrity mismatch
+    → discard frame
+
+external dependency failure
+    → bounded timeout / explicit error
+
+duplicate event
+    → consumer must remain idempotent
 ```
 
-## Aviso
+## Compatibility rules
 
-Este repositório é uma demonstração técnica independente. Não representa um ambiente de produção e não permite operar veículos reais. Protocolos públicos neste projeto são contratos de sandbox destinados a estudo de arquitetura, testes e documentação.
+1. Existing field semantics do not change silently.
+2. Breaking semantics require a major-version decision.
+3. Optional application-level extensions must not redefine existing fields.
+4. Unknown required protocol behavior is rejected instead of guessed.
+5. Public examples remain independent from production infrastructure.
 
-## Autor
+## Security boundary
 
-**Davi Menezes** — VOE LAB  
-Mobilidade urbana • Software • IoT • Produto
+Public material may include:
+
+- architecture documents;
+- RFCs;
+- synthetic identifiers;
+- synthetic telemetry;
+- non-routable example endpoints;
+- local simulators;
+- schema and compatibility concepts;
+- failure-mode documentation.
+
+Public material does not intentionally include:
+
+- production credentials;
+- private keys;
+- authentication secrets;
+- internal production hostnames;
+- customer information;
+- personal profile information;
+- real fleet identifiers;
+- firmware secrets;
+- operational device-control interfaces.
+
+See `SECURITY.md` for the repository security policy.
+
+## Engineering invariants
+
+```text
+explicit contracts       > implicit coupling
+bounded parsing          > unbounded input
+fail-closed semantics    > permissive guessing
+idempotent processing    > duplicate side effects
+observable failures      > invisible state
+reproducible fixtures    > environment-dependent examples
+synthetic public data    > production-data exposure
+```
+
+## Local simulator
+
+The telemetry simulator runs locally:
+
+```bash
+node telemetry/simulator.js
+```
+
+It produces synthetic events for contract and observability experiments and does not connect to production services or physical devices.
+
+## Scope
+
+This repository is for public systems-engineering demonstrations, contract design and safe experimentation. It is not an operational fleet system and is not intended to control real hardware.
