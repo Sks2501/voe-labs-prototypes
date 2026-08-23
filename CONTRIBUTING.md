@@ -1,63 +1,64 @@
-# VOE LAB Engineering Contribution Standard
+# Padrão de Contribuição — Engenharia de Sistemas
 
-This repository is a public systems-engineering sandbox. Contributions must preserve the boundary between reproducible research artifacts and production/physical control systems.
+Este repositório é um sandbox público e genérico. Toda contribuição deve preservar a separação entre pesquisa reproduzível e sistemas reais.
 
-## 1. Scope
+## Escopo aceito
 
-Accepted changes include:
+- especificações de protocolo sintético;
+- contratos OpenAPI;
+- eventos e telemetria fictícia;
+- simuladores determinísticos;
+- documentação de arquitetura;
+- testes de conformidade;
+- parsers e codecs usando frames artificiais;
+- documentação de observabilidade e falhas.
 
-- public protocol specifications;
-- synthetic telemetry contracts;
-- deterministic simulators;
-- OpenAPI schemas;
-- architecture decision records;
-- parser/codec research using synthetic frames;
-- conformance tests;
-- observability and failure-model documentation.
+## Não aceito
 
-Not accepted in this public repository:
+- nomes de empresas ou marcas privadas;
+- credenciais;
+- dados reais de clientes;
+- topologia privada;
+- identificadores reais de dispositivos;
+- endpoints de produção;
+- comandos de atuação física;
+- procedimentos de bypass ou desbloqueio;
+- código proprietário de terceiros.
 
-- production credentials;
-- real customer/user data;
-- private infrastructure topology;
-- real fleet identifiers;
-- operational device-control commands;
-- bypass/unlock procedures;
-- proprietary code obtained from third parties.
+## Workflow contract-first
 
-## 2. Contract-first workflow
+Mudanças externas devem documentar:
 
-Any externally consumed artifact must begin with a versioned contract. A change to a protocol, schema, event envelope or API must identify:
+1. versão do contrato;
+2. invariantes;
+3. limites de campos;
+4. compatibilidade;
+5. semântica de falha;
+6. migração;
+7. rollback;
+8. testes de conformidade.
 
-1. contract version;
-2. invariants;
-3. field bounds;
-4. compatibility behavior;
-5. failure semantics;
-6. migration path;
-7. rollback path;
-8. conformance tests.
+## Protocolos
 
-## 3. Protocol requirements
+Protocolos devem possuir tamanhos limitados, parsing determinístico, endianness explícita, versão, rejeição de entrada truncada, validação de integridade e comportamento definido para tipos desconhecidos.
 
-Protocol research must use bounded lengths, deterministic parsing, explicit endianness, version fields, reserved-bit semantics, integrity/error handling and rejection behavior for malformed input. Parsers must never trust length or type fields before validating bounds.
+## APIs
 
-## 4. API requirements
+Contratos HTTP devem definir erros estáveis, correlação, paginação limitada, validação e compatibilidade. URLs públicas de exemplo devem permanecer não roteáveis.
 
-HTTP contracts must define stable error envelopes, request correlation, pagination bounds, validation rules, compatibility policy and rate-limit semantics where relevant. Do not publish reachable production server URLs.
+## Testes
 
-## 5. Telemetry requirements
+Cobrir quando aplicável:
 
-Telemetry examples must remain synthetic. Event envelopes should keep schema identity, event identity, sequence, timestamp, source and payload separate. Sequence numbers are diagnostic ordering material, never authentication material.
+- caminho válido;
+- valores de fronteira;
+- truncamento;
+- tipo ou versão desconhecida;
+- duplicação;
+- reordenação;
+- timeout;
+- regressão determinística.
 
-## 6. Testing
+## Gate de revisão
 
-Changes should cover valid cases, boundary values, malformed input, unknown versions/types, truncation, duplicate events, out-of-order events and deterministic regression fixtures where applicable.
-
-## 7. Security
-
-Public artifacts must fail closed and minimize attack surface. Never commit secrets, production endpoint inventories, real device identifiers, real geolocation traces or unrestricted control interfaces.
-
-## 8. Review gate
-
-A change is merge-ready only when its contract, compatibility, tests, failure behavior, security boundary and rollback implications are explicit.
+Uma mudança não está pronta enquanto contrato, limites, compatibilidade, falhas, testes, segurança e rollback não estiverem explícitos.
