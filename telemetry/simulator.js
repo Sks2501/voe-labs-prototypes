@@ -1,31 +1,23 @@
 /**
- * VOE LAB — simulador público de telemetria v2.
- *
- * Garantias deliberadas de segurança:
- * - gera somente dados sintéticos;
- * - não acessa rede;
- * - não acessa Bluetooth;
- * - não acessa UART/serial;
- * - não lê arquivos locais;
- * - não envia comandos;
- * - não controla dispositivos.
+ * Systems Lab — simulador público e genérico de telemetria.
+ * Gera somente dados sintéticos e não acessa rede, hardware ou arquivos privados.
  */
 
 "use strict";
 
-const SCHEMA = "voe.lab.telemetry.demo.v1";
+const SCHEMA = "systems.lab.telemetry.demo.v1";
 const SOURCE = "local-simulator";
 const INTERVAL_MS = 3000;
 
-const vehicles = Object.freeze([
-  Object.freeze({ id: "VOE-DEMO-01", model: "LAB-SCOOTER-A", zone: "Estação Coral" }),
-  Object.freeze({ id: "VOE-DEMO-02", model: "LAB-SCOOTER-A", zone: "Praça Demo" }),
-  Object.freeze({ id: "VOE-DEMO-03", model: "LAB-SCOOTER-B", zone: "VOE LAB" })
+const resources = Object.freeze([
+  Object.freeze({ id: "SYS-DEMO-01", model: "GENERIC-NODE-A", zone: "Zona Sintética A" }),
+  Object.freeze({ id: "SYS-DEMO-02", model: "GENERIC-NODE-A", zone: "Zona Sintética B" }),
+  Object.freeze({ id: "SYS-DEMO-03", model: "GENERIC-NODE-B", zone: "Zona Sintética C" })
 ]);
 
 const eventTypes = Object.freeze([
   "heartbeat.demo",
-  "battery.sample.demo",
+  "metric.sample.demo",
   "position.sample.demo",
   "state.sample.demo"
 ]);
@@ -37,144 +29,70 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function pad(value, width) {
-  return String(value).padStart(width, "0");
-}
-
 function nextEventId() {
   eventCounter += 1;
-  return `evt_demo_${pad(eventCounter, 6)}`;
+  return `evt_demo_${String(eventCounter).padStart(6, "0")}`;
 }
 
-function batteryFor(index) {
+function metricFor(index) {
   const oscillation = (sequence * 3 + index * 11) % 77;
   return clamp(96 - oscillation, 19, 96);
 }
 
-function statusFor(batteryPercent, index) {
-  if (batteryPercent < 25) {
-    return "maintenance-demo";
-  }
-
-  if ((sequence + index) % 17 === 0) {
-    return "charging-demo";
-  }
-
-  if ((sequence + index) % 29 === 0) {
-    return "offline-demo";
-  }
-
-  return "available-demo";
+function statusFor(metricPercent, index) {
+  if (metricPercent < 25) return "maintenance-demo";
+  if ((sequence + index) % 17 === 0) return "busy-demo";
+  if ((sequence + index) % 29 === 0) return "offline-demo";
+  return "ready-demo";
 }
 
 function coordinatesFor(index) {
   const drift = (sequence % 10) * 0.00001;
-
   return Object.freeze({
-    latitude: Number((-22.9 + index * 0.001 + drift).toFixed(6)),
-    longitude: Number((-43.18 - index * 0.001 - drift).toFixed(6)),
+    latitude: Number((-10 + index * 0.001 + drift).toFixed(6)),
+    longitude: Number((-20 - index * 0.001 - drift).toFixed(6)),
     precision: "synthetic"
   });
 }
 
-function baseEvent(vehicle, eventType) {
-  return {
+function buildEvent(resource, index, eventType) {
+  const metricPercent = metricFor(index);
+  const status = statusFor(metricPercent, index);
+  const base = {
     schema: SCHEMA,
     eventId: nextEventId(),
     eventType,
     sequence,
-    vehicleId: vehicle.id,
+    resourceId: resource.id,
     recordedAt: new Date().toISOString(),
     source: SOURCE
   };
-}
-
-function buildEvent(vehicle, index, eventType) {
-  const batteryPercent = batteryFor(index);
-  const status = statusFor(batteryPercent, index);
-  const event = baseEvent(vehicle, eventType);
 
   switch (eventType) {
     case "heartbeat.demo":
-      return {
-        ...event,
-        payload: {
-          model: vehicle.model,
-          status,
-          zone: vehicle.zone
-        }
-      };
-
-    case "battery.sample.demo":
-      return {
-        ...event,
-        payload: {
-          batteryPercent,
-          status,
-          zone: vehicle.zone
-        }
-      };
-
+      return { ...base, payload: { model: resource.model, status, zone: resource.zone } };
+    case "metric.sample.demo":
+      return { ...base, payload: { metricPercent, status, zone: resource.zone } };
     case "position.sample.demo":
-      return {
-        ...event,
-        payload: {
-          status,
-          zone: vehicle.zone,
-          coordinates: coordinatesFor(index)
-        }
-      };
-
+      return { ...base, payload: { status, zone: resource.zone, coordinates: coordinatesFor(index) } };
     case "state.sample.demo":
-      return {
-        ...event,
-        payload: {
-          batteryPercent,
-          status,
-          zone: vehicle.zone,
-          coordinates: coordinatesFor(index)
-        }
-      };
-
+      return { ...base, payload: { metricPercent, status, zone: resource.zone, coordinates: coordinatesFor(index) } };
     default:
-      throw new Error(`Tipo de evento demonstrativo não suportado: ${eventType}`);
+      throw new Error(`Tipo de evento não suportado: ${eventType}`);
   }
 }
 
 function validateEvent(event) {
-  if (event.schema !== SCHEMA) {
-    throw new Error("Schema demonstrativo inválido.");
-  }
-
-  if (!/^evt_demo_[0-9]{6}$/.test(event.eventId)) {
-    throw new Error("eventId demonstrativo inválido.");
-  }
-
-  if (!eventTypes.includes(event.eventType)) {
-    throw new Error("eventType demonstrativo inválido.");
-  }
-
-  if (!Number.isInteger(event.sequence) || event.sequence < 0) {
-    throw new Error("Sequência demonstrativa inválida.");
-  }
-
-  if (!/^VOE-DEMO-[0-9]{2}$/.test(event.vehicleId)) {
-    throw new Error("vehicleId demonstrativo inválido.");
-  }
-
-  if (event.source !== SOURCE) {
-    throw new Error("Fonte demonstrativa inválida.");
-  }
-
-  if (Number.isNaN(Date.parse(event.recordedAt))) {
-    throw new Error("Timestamp demonstrativo inválido.");
-  }
-
+  if (event.schema !== SCHEMA) throw new Error("schema_invalido");
+  if (!/^evt_demo_[0-9]{6}$/.test(event.eventId)) throw new Error("event_id_invalido");
+  if (!eventTypes.includes(event.eventType)) throw new Error("event_type_invalido");
+  if (!Number.isInteger(event.sequence) || event.sequence < 0) throw new Error("sequence_invalida");
+  if (!/^SYS-DEMO-[0-9]{2}$/.test(event.resourceId)) throw new Error("resource_id_invalido");
+  if (event.source !== SOURCE) throw new Error("source_invalido");
+  if (Number.isNaN(Date.parse(event.recordedAt))) throw new Error("timestamp_invalido");
   if (typeof event.payload !== "object" || event.payload === null || Array.isArray(event.payload)) {
-    throw new Error("Payload demonstrativo inválido.");
+    throw new Error("payload_invalido");
   }
-
-  return true;
 }
 
 function emit(event) {
@@ -183,25 +101,21 @@ function emit(event) {
 }
 
 function tick() {
-  for (const [index, vehicle] of vehicles.entries()) {
+  for (const [index, resource] of resources.entries()) {
     const eventType = eventTypes[(sequence + index) % eventTypes.length];
-    emit(buildEvent(vehicle, index, eventType));
+    emit(buildEvent(resource, index, eventType));
   }
-
   sequence += 1;
 }
 
 function shutdown(signal) {
-  process.stderr.write(`VOE LAB telemetry demo encerrado por ${signal}.\n`);
+  process.stderr.write(`simulador encerrado por ${signal}\n`);
   process.exit(0);
 }
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
-process.stderr.write(
-  `VOE LAB telemetry demo v2 iniciado | schema=${SCHEMA} | intervalo=${INTERVAL_MS}ms | sem rede/hardware real\n`
-);
-
+process.stderr.write(`Systems Lab simulator | schema=${SCHEMA} | intervalo=${INTERVAL_MS}ms | dados sintéticos\n`);
 tick();
 setInterval(tick, INTERVAL_MS);
