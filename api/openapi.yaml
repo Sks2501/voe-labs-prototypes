@@ -1,36 +1,28 @@
 openapi: 3.0.3
 info:
-  title: VOE LAB Public Sandbox API
-  version: 2.0.0
+  title: Systems Lab Public Sandbox API
+  version: 3.0.0
   description: |
-    Especificação pública e exclusivamente demonstrativa do VOE LAB.
-    Todos os dados são sintéticos. Esta API não possui comandos de atuação,
-    desbloqueio, configuração, provisionamento, manutenção remota ou acesso
-    a veículos, pessoas, credenciais ou infraestrutura de produção.
-  contact:
-    name: VOE LAB
-    url: https://github.com/Sks2501/voe-labs-prototypes
+    API pública, genérica, somente leitura e composta exclusivamente por dados sintéticos.
+    Não representa empresa, marca, infraestrutura privada, dispositivos reais ou ambiente de produção.
 servers:
-  - url: https://sandbox.example.invalid/voe-lab
-    description: Endereço intencionalmente inválido e não roteável
+  - url: https://sandbox.example.invalid/systems-lab
+    description: Endpoint propositalmente não roteável
 
 tags:
   - name: System
-    description: Estado lógico do sandbox demonstrativo.
-  - name: Fleet
-    description: Consulta somente leitura da frota fictícia.
+  - name: Resources
   - name: Telemetry
-    description: Eventos sintéticos de telemetria, somente leitura.
 
 paths:
   /v1/status:
     get:
       tags: [System]
-      summary: Retorna o estado do sandbox
-      operationId: getSandboxStatus
+      operationId: getStatus
+      summary: Retorna o estado lógico do sandbox
       responses:
         "200":
-          description: Estado lógico do ambiente demonstrativo
+          description: Estado do ambiente sintético
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -38,14 +30,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StatusResponse"
-        "429":
-          $ref: "#/components/responses/RateLimited"
 
-  /v1/vehicles:
+  /v1/resources:
     get:
-      tags: [Fleet]
-      summary: Lista veículos fictícios
-      operationId: listDemoVehicles
+      tags: [Resources]
+      operationId: listResources
+      summary: Lista recursos sintéticos
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
@@ -53,59 +43,50 @@ paths:
           in: query
           required: false
           schema:
-            $ref: "#/components/schemas/VehicleStatus"
+            $ref: "#/components/schemas/ResourceStatus"
       responses:
         "200":
-          description: Página da frota demonstrativa
-          headers:
-            X-Request-Id:
-              $ref: "#/components/headers/RequestId"
+          description: Página de recursos sintéticos
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/VehicleListResponse"
+                $ref: "#/components/schemas/ResourceListResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "429":
           $ref: "#/components/responses/RateLimited"
 
-  /v1/vehicles/{vehicleId}:
+  /v1/resources/{resourceId}:
     get:
-      tags: [Fleet]
-      summary: Consulta um veículo fictício
-      operationId: getDemoVehicle
+      tags: [Resources]
+      operationId: getResource
+      summary: Consulta um recurso sintético
       parameters:
-        - $ref: "#/components/parameters/VehicleId"
+        - $ref: "#/components/parameters/ResourceId"
       responses:
         "200":
-          description: Veículo demonstrativo encontrado
-          headers:
-            X-Request-Id:
-              $ref: "#/components/headers/RequestId"
+          description: Recurso encontrado
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/VehicleResponse"
+                $ref: "#/components/schemas/ResourceResponse"
         "404":
           $ref: "#/components/responses/NotFound"
-        "429":
-          $ref: "#/components/responses/RateLimited"
 
   /v1/telemetry/events:
     get:
       tags: [Telemetry]
-      summary: Lista eventos sintéticos de telemetria
-      operationId: listSyntheticTelemetryEvents
+      operationId: listTelemetryEvents
+      summary: Lista eventos sintéticos
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
-        - name: vehicleId
+        - name: resourceId
           in: query
           required: false
           schema:
             type: string
-            pattern: "^VOE-DEMO-[0-9]{2}$"
-          example: VOE-DEMO-01
+            pattern: "^SYS-DEMO-[0-9]{2}$"
         - name: eventType
           in: query
           required: false
@@ -114,9 +95,6 @@ paths:
       responses:
         "200":
           description: Página de eventos sintéticos
-          headers:
-            X-Request-Id:
-              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
@@ -129,21 +107,20 @@ paths:
 components:
   headers:
     RequestId:
-      description: Identificador opaco de correlação da requisição demonstrativa.
+      description: Identificador opaco de correlação.
       schema:
         type: string
-        example: req_demo_01JABCDEF1234567890
+        example: req_demo_000001
 
   parameters:
-    VehicleId:
-      name: vehicleId
+    ResourceId:
+      name: resourceId
       in: path
       required: true
-      description: Identificador exclusivamente fictício do veículo.
       schema:
         type: string
-        pattern: "^VOE-DEMO-[0-9]{2}$"
-      example: VOE-DEMO-01
+        pattern: "^SYS-DEMO-[0-9]{2}$"
+      example: SYS-DEMO-01
     Page:
       name: page
       in: query
@@ -164,32 +141,21 @@ components:
 
   responses:
     BadRequest:
-      description: Parâmetros de consulta inválidos
+      description: Parâmetros inválidos
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: INVALID_ARGUMENT
-              message: Um ou mais parâmetros são inválidos.
-              requestId: req_demo_01JABCDEF1234567890
     NotFound:
-      description: Recurso fictício não encontrado
+      description: Recurso não encontrado
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: NOT_FOUND
-              message: Recurso demonstrativo não encontrado.
-              requestId: req_demo_01JABCDEF1234567890
     RateLimited:
-      description: Limite lógico do sandbox excedido
+      description: Limite lógico excedido
       headers:
         Retry-After:
-          description: Segundos sugeridos antes de nova tentativa.
           schema:
             type: integer
             minimum: 1
@@ -198,11 +164,6 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-          example:
-            error:
-              code: RATE_LIMITED
-              message: Limite demonstrativo temporariamente excedido.
-              requestId: req_demo_01JABCDEF1234567890
 
   schemas:
     StatusResponse:
@@ -215,7 +176,7 @@ components:
           properties:
             service:
               type: string
-              example: voe-lab-public-sandbox
+              example: systems-lab-public-sandbox
             environment:
               type: string
               enum: [demonstration]
@@ -224,125 +185,81 @@ components:
               enum: [operational-demo]
             version:
               type: string
-              example: 2.0.0
+              example: 3.0.0
         meta:
           $ref: "#/components/schemas/ResponseMeta"
 
-    VehicleStatus:
+    ResourceStatus:
       type: string
-      enum:
-        - available-demo
-        - charging-demo
-        - maintenance-demo
-        - offline-demo
+      enum: [ready-demo, busy-demo, maintenance-demo, offline-demo]
 
-    DemoVehicle:
+    DemoResource:
       type: object
-      required:
-        - id
-        - model
-        - status
-        - batteryPercent
-        - zone
-        - lastSyntheticTelemetryAt
+      required: [id, model, status, metricPercent, zone, lastEventAt]
       properties:
         id:
           type: string
-          pattern: "^VOE-DEMO-[0-9]{2}$"
-          example: VOE-DEMO-01
+          pattern: "^SYS-DEMO-[0-9]{2}$"
+          example: SYS-DEMO-01
         model:
           type: string
-          example: LAB-SCOOTER-A
+          example: GENERIC-NODE-A
         status:
-          $ref: "#/components/schemas/VehicleStatus"
-        batteryPercent:
+          $ref: "#/components/schemas/ResourceStatus"
+        metricPercent:
           type: integer
           minimum: 0
           maximum: 100
           example: 84
         zone:
           type: string
-          example: Estação Coral
-        lastSyntheticTelemetryAt:
+          example: Zona Sintética A
+        lastEventAt:
           type: string
           format: date-time
-          example: "2026-08-23T03:00:00Z"
 
-    VehicleResponse:
+    ResourceResponse:
       type: object
       required: [data, meta]
       properties:
         data:
-          $ref: "#/components/schemas/DemoVehicle"
+          $ref: "#/components/schemas/DemoResource"
         meta:
           $ref: "#/components/schemas/ResponseMeta"
 
-    VehicleListResponse:
+    ResourceListResponse:
       type: object
       required: [data, meta]
       properties:
         data:
           type: array
           items:
-            $ref: "#/components/schemas/DemoVehicle"
+            $ref: "#/components/schemas/DemoResource"
         meta:
           $ref: "#/components/schemas/PaginatedMeta"
 
     TelemetryEventType:
       type: string
-      enum:
-        - heartbeat.demo
-        - battery.sample.demo
-        - position.sample.demo
-        - state.sample.demo
-
-    SyntheticCoordinates:
-      type: object
-      required: [latitude, longitude, precision]
-      properties:
-        latitude:
-          type: number
-          format: double
-          minimum: -90
-          maximum: 90
-          example: -22.9
-        longitude:
-          type: number
-          format: double
-          minimum: -180
-          maximum: 180
-          example: -43.18
-        precision:
-          type: string
-          enum: [synthetic]
+      enum: [heartbeat.demo, metric.sample.demo, position.sample.demo, state.sample.demo]
 
     TelemetryEvent:
       type: object
-      required:
-        - schema
-        - eventId
-        - eventType
-        - sequence
-        - vehicleId
-        - recordedAt
-        - source
+      required: [schema, eventId, eventType, sequence, resourceId, recordedAt, source, payload]
       properties:
         schema:
           type: string
-          enum: [voe.lab.telemetry.demo.v1]
+          enum: [systems.lab.telemetry.demo.v1]
         eventId:
           type: string
-          example: evt_demo_000001
+          pattern: "^evt_demo_[0-9]{6}$"
         eventType:
           $ref: "#/components/schemas/TelemetryEventType"
         sequence:
           type: integer
           minimum: 0
-          example: 42
-        vehicleId:
+        resourceId:
           type: string
-          pattern: "^VOE-DEMO-[0-9]{2}$"
-          example: VOE-DEMO-01
+          pattern: "^SYS-DEMO-[0-9]{2}$"
         recordedAt:
           type: string
           format: date-time
@@ -351,18 +268,7 @@ components:
           enum: [local-simulator]
         payload:
           type: object
-          additionalProperties: false
-          properties:
-            batteryPercent:
-              type: integer
-              minimum: 0
-              maximum: 100
-            status:
-              $ref: "#/components/schemas/VehicleStatus"
-            zone:
-              type: string
-            coordinates:
-              $ref: "#/components/schemas/SyntheticCoordinates"
+          additionalProperties: true
 
     TelemetryListResponse:
       type: object
@@ -381,7 +287,6 @@ components:
       properties:
         requestId:
           type: string
-          example: req_demo_01JABCDEF1234567890
         generatedAt:
           type: string
           format: date-time
@@ -398,20 +303,16 @@ components:
             page:
               type: integer
               minimum: 1
-              example: 1
             pageSize:
               type: integer
               minimum: 1
               maximum: 100
-              example: 25
             totalItems:
               type: integer
               minimum: 0
-              example: 3
             totalPages:
               type: integer
               minimum: 0
-              example: 1
 
     ErrorResponse:
       type: object
@@ -423,11 +324,7 @@ components:
           properties:
             code:
               type: string
-              enum:
-                - INVALID_ARGUMENT
-                - NOT_FOUND
-                - RATE_LIMITED
-                - INTERNAL_DEMO_ERROR
+              enum: [INVALID_ARGUMENT, NOT_FOUND, RATE_LIMITED, INTERNAL_DEMO_ERROR]
             message:
               type: string
             requestId:
