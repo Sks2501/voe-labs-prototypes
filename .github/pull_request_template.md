@@ -1,63 +1,65 @@
-## Engineering change
-Describe the research/engineering problem, the contract affected and the implementation strategy.
+## Mudança de engenharia
+Descreva o problema técnico, o contrato afetado e a estratégia de implementação.
 
-## Artifact class
-- [ ] Protocol/RFC
-- [ ] OpenAPI/API contract
-- [ ] Synthetic telemetry contract
-- [ ] Deterministic simulator/tooling
-- [ ] Architecture/security documentation
-- [ ] Conformance/regression testing
-- [ ] Documentation only
+## Classe do artefato
+- [ ] Protocolo / RFC sintético
+- [ ] OpenAPI / contrato HTTP
+- [ ] Evento sintético
+- [ ] Simulador determinístico
+- [ ] Arquitetura / segurança
+- [ ] Teste de conformidade / regressão
+- [ ] Documentação
 
-## Contract and compatibility
-- Contract/schema version:
-- Previous behavior:
-- New behavior:
-- Backward compatibility:
-- Migration/deprecation plan:
+## Contrato e compatibilidade
+- Versão do contrato:
+- Comportamento anterior:
+- Comportamento novo:
+- Compatibilidade retroativa:
+- Migração/depreciação:
 
-## Protocol/parser analysis
-Where applicable, document:
+## Análise de protocolo/parser
+Quando aplicável, documente:
 
-- byte/field bounds;
+- limites de campos;
 - endianness;
-- version handling;
-- malformed/truncated input rejection;
-- unknown type/version behavior;
-- integrity/error semantics;
-- allocation/resource bounds.
+- versionamento;
+- rejeição de entrada truncada;
+- comportamento para tipos desconhecidos;
+- integridade;
+- limites de alocação/recursos.
 
-## Failure analysis
-- Expected failure modes:
-- Duplicate/out-of-order behavior:
-- Timeout/cancellation behavior:
-- Retry/idempotency behavior:
-- Degraded-mode behavior:
+## Falhas e resiliência
+- Modos de falha esperados:
+- Duplicação/reordenação:
+- Timeout/cancelamento:
+- Retry/idempotência:
+- Backpressure:
+- Estado degradado:
 
-## Public safety boundary
-- [ ] Synthetic data only
-- [ ] No real user/customer data
-- [ ] No real fleet/device identifiers
-- [ ] No production credentials or endpoints
-- [ ] No unrestricted device-control path
-- [ ] No bypass/unlock procedure
-- [ ] No third-party proprietary code
+## Fronteira pública
+- [ ] Dados exclusivamente sintéticos
+- [ ] Sem empresas ou marcas privadas
+- [ ] Sem dados reais de pessoas/clientes
+- [ ] Sem identificadores reais de dispositivos
+- [ ] Sem credenciais ou endpoints de produção
+- [ ] Sem caminho de atuação física
+- [ ] Sem procedimento de bypass/desbloqueio
+- [ ] Sem código proprietário de terceiros
 
-## Verification
-- [ ] Valid fixture tested
-- [ ] Boundary values tested
-- [ ] Malformed input tested
-- [ ] Unknown version/type tested where applicable
-- [ ] Truncation tested where applicable
-- [ ] Duplicate/out-of-order behavior tested where applicable
-- [ ] Regression fixture added where applicable
+## Verificação
+- [ ] Caso válido
+- [ ] Valores de fronteira
+- [ ] Entrada malformada
+- [ ] Tipo/versão desconhecida
+- [ ] Truncamento
+- [ ] Duplicação/reordenação quando aplicável
+- [ ] Regressão determinística
 
-## Observability
-Describe deterministic diagnostics, correlation fields or signals used to understand behavior without exposing sensitive data.
+## Observabilidade
+Descreva sinais, métricas, logs e campos de correlação necessários para diagnosticar comportamento sem expor informação sensível.
 
 ## Rollback
-Describe how the contract/artifact can be reverted without leaving ambiguous compatibility behavior.
+Descreva como reverter a mudança sem deixar contratos ambíguos.
 
-## Review gate
-Do not approve until contract, bounds, failure semantics, compatibility, verification and public safety boundaries are explicit.
+## Gate
+Não aprovar enquanto contrato, limites, falhas, compatibilidade, testes, segurança pública e rollback não estiverem explícitos.
