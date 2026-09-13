@@ -50,8 +50,8 @@ public final class MainActivity extends Activity implements BleInspector.Listene
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
         webhookLogger = new DiscordWebhookLogger(WebhookConfig.load(this));
         webhookLogger.enqueueSessionHeader();
-        append("IoT Inspector RO 1.0\n");
-        append("Modo: diagnóstico passivo / sem escrita GATT / sem comandos de atuador.\n");
+        append("IoT Inspector RO 1.3\n");
+        append("Modo: diagnóstico passivo + comandos NFC-V somente leitura; sem escrita GATT/NFC e sem comandos de atuador.\n");
         append("NFC presente: " + (nfcAdapter != null) + "\n");
         append("BLE presente: " + ble.isAvailable() + "\n");
         append("Webhook Discord: " + (webhookLogger.isConfigured() ? "configurado" : "não configurado") + "\n\n");
@@ -72,7 +72,7 @@ public final class MainActivity extends Activity implements BleInspector.Listene
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("NFC + BLE/GATT somente leitura");
+        subtitle.setText("NFC-V ISO15693 + BLE/GATT somente leitura");
         subtitle.setTextSize(14);
         root.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
 
@@ -126,7 +126,7 @@ public final class MainActivity extends Activity implements BleInspector.Listene
         root.addView(actions2, new LinearLayout.LayoutParams(-1, -2));
 
         TextView hint = new TextView(this);
-        hint.setText("NFC: aproxime a tag do celular. BLE: selecione um item e toque em Ler GATT.");
+        hint.setText("NFC: aproxime a tag; o app envia automaticamente apenas comandos ISO15693 de leitura e registra TX/RX. BLE: selecione um item e toque em Ler GATT.");
         hint.setPadding(0, dp(8), 0, dp(4));
         root.addView(hint, new LinearLayout.LayoutParams(-1, -2));
 
