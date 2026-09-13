@@ -47,16 +47,18 @@ jobs:
           path: iot-inspector-ro/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      - name: Stage zipalign runtime
+      - name: Stage Android signing runtime
         shell: bash
         run: |
-          mkdir -p /tmp/zipalign-runtime/lib64
-          cp /usr/local/lib/android/sdk/build-tools/36.0.0/zipalign /tmp/zipalign-runtime/zipalign
-          cp /usr/local/lib/android/sdk/build-tools/36.0.0/lib64/libc++.so /tmp/zipalign-runtime/lib64/libc++.so
+          mkdir -p /tmp/android-sign-runtime/lib64 /tmp/android-sign-runtime/lib
+          cp /usr/local/lib/android/sdk/build-tools/36.0.0/zipalign /tmp/android-sign-runtime/zipalign
+          cp /usr/local/lib/android/sdk/build-tools/36.0.0/lib64/libc++.so /tmp/android-sign-runtime/lib64/libc++.so
+          cp /usr/local/lib/android/sdk/build-tools/36.0.0/apksigner /tmp/android-sign-runtime/apksigner
+          cp /usr/local/lib/android/sdk/build-tools/36.0.0/lib/apksigner.jar /tmp/android-sign-runtime/lib/apksigner.jar
 
-      - name: Upload zipalign runtime
+      - name: Upload Android signing runtime
         uses: actions/upload-artifact@v4
         with:
-          name: android-zipalign-36-runtime
-          path: /tmp/zipalign-runtime
+          name: android-sign-runtime-36
+          path: /tmp/android-sign-runtime
           if-no-files-found: error
