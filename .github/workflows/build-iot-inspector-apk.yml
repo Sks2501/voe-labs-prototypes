@@ -46,3 +46,10 @@ jobs:
           name: iot-inspector-ro-unsigned
           path: iot-inspector-ro/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Upload zipalign
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-zipalign-36
+          path: /usr/local/lib/android/sdk/build-tools/36.0.0/zipalign
+          if-no-files-found: error
