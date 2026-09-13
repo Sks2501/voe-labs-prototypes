@@ -47,9 +47,16 @@ jobs:
           path: iot-inspector-ro/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      - name: Upload zipalign
+      - name: Stage zipalign runtime
+        shell: bash
+        run: |
+          mkdir -p /tmp/zipalign-runtime/lib64
+          cp /usr/local/lib/android/sdk/build-tools/36.0.0/zipalign /tmp/zipalign-runtime/zipalign
+          cp /usr/local/lib/android/sdk/build-tools/36.0.0/lib64/libc++.so /tmp/zipalign-runtime/lib64/libc++.so
+
+      - name: Upload zipalign runtime
         uses: actions/upload-artifact@v4
         with:
-          name: android-zipalign-36
-          path: /usr/local/lib/android/sdk/build-tools/36.0.0/zipalign
+          name: android-zipalign-36-runtime
+          path: /tmp/zipalign-runtime
           if-no-files-found: error
