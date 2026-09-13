@@ -6,6 +6,7 @@ import android.nfc.Tag;
 import android.nfc.tech.MifareUltralight;
 import android.nfc.tech.Ndef;
 import android.nfc.tech.NfcA;
+import android.nfc.tech.NfcV;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -14,6 +15,9 @@ import java.util.Arrays;
 import java.util.Locale;
 
 final class NfcInspector {
+    private static final byte ISO15693_FLAG_HIGH_DATA_RATE = 0x02;
+    private static final int MAX_DIAGNOSTIC_BLOCKS = 128;
+
     private NfcInspector() {}
 
     static String inspect(Tag tag) {
@@ -26,6 +30,7 @@ final class NfcInspector {
 
         inspectNfcA(tag, out);
         inspectNdef(tag, out);
+        inspectNfcV(tag, out);
         inspectUltralight(tag, out);
 
         out.append("=== FIM NFC ===\n");
@@ -96,6 +101,164 @@ final class NfcInspector {
         if (textOffset > payload.length) return "<registro texto inválido>";
         Charset charset = utf16 ? StandardCharsets.UTF_16 : StandardCharsets.UTF_8;
         return new String(payload, textOffset, payload.length - textOffset, charset);
+    }
+
+    private static void inspectNfcV(Tag tag, StringBuilder out) {
+        NfcV nfcV = NfcV.get(tag);
+        if (nfcV == null) return;
+
+        out.append("\n=== NFC-V / ISO15693 READ-ONLY PROBE ===\n");
+        out.append(String.format(Locale.US, "Discovery response flags: 0x%02X%n", nfcV.getResponseFlags() & 0xFF));
+        out.append(String.format(Locale.US, "Discovery DSFID: 0x%02X%n", nfcV.getDsfId() & 0xFF));
+        out.append("Max transceive: ").append(nfcV.getMaxTransceiveLength()).append(" bytes\n");
+        out.append("Política: somente comandos de leitura; WRITE/LOCK/PASSWORD desabilitados.\n");
+
+        try {
+            nfcV.connect();
+
+            byte[] systemResponse = transceive(nfcV, "Get System Information (0x2B)",
+                    new byte[]{ISO15693_FLAG_HIGH_DATA_RATE, 0x2B}, out);
+            SystemInfo info = parseSystemInfo(systemResponse, out);
+
+            int blockLimit = info != null && info.blockCount > 0
+                    ? Math.min(info.blockCount, MAX_DIAGNOSTIC_BLOCKS)
+                    : 32;
+
+            if (info != null && info.blockCount > MAX_DIAGNOSTIC_BLOCKS) {
+                out.append("Memória possui ").append(info.blockCount)
+                        .append(" blocks; diagnóstico limitado aos primeiros ")
+                        .append(MAX_DIAGNOSTIC_BLOCKS).append(".\n");
+            }
+
+            int multipleCount = Math.min(blockLimit, 4);
+            if (multipleCount > 0) {
+                transceive(nfcV, "Read Multiple Blocks 0.." + (multipleCount - 1) + " (0x23)",
+                        new byte[]{ISO15693_FLAG_HIGH_DATA_RATE, 0x23, 0x00,
+                                (byte) (multipleCount - 1)}, out);
+            }
+
+            out.append("\n--- Read Single Block (0x20) ---\n");
+            int consecutiveFailures = 0;
+            for (int block = 0; block < blockLimit; block++) {
+                byte[] response = transceive(nfcV,
+                        String.format(Locale.US, "Read block %d", block),
+                        new byte[]{ISO15693_FLAG_HIGH_DATA_RATE, 0x20, (byte) block}, out);
+                if (isSuccess(response)) {
+                    consecutiveFailures = 0;
+                    if (response.length > 1) {
+                        byte[] data = Arrays.copyOfRange(response, 1, response.length);
+                        out.append(String.format(Locale.US, "  BLOCK %03d DATA: %s | %s%n",
+                                block, Hex.bytes(data), Hex.ascii(data)));
+                    }
+                } else {
+                    consecutiveFailures++;
+                    if (info == null && consecutiveFailures >= 4) {
+                        out.append("Parando probe sem System Info após 4 blocks consecutivos não acessíveis.\n");
+                        break;
+                    }
+                }
+            }
+
+            if (blockLimit > 0) {
+                out.append("\n--- Get Multiple Block Security Status (0x2C) ---\n");
+                for (int first = 0; first < blockLimit; first += 16) {
+                    int count = Math.min(16, blockLimit - first);
+                    transceive(nfcV,
+                            String.format(Locale.US, "Security blocks %d..%d", first, first + count - 1),
+                            new byte[]{ISO15693_FLAG_HIGH_DATA_RATE, 0x2C,
+                                    (byte) first, (byte) (count - 1)}, out);
+                }
+            }
+        } catch (Exception e) {
+            out.append("NFC-V erro geral: ").append(e.getClass().getSimpleName()).append(": ")
+                    .append(e.getMessage()).append('\n');
+        } finally {
+            try { nfcV.close(); } catch (Exception ignored) {}
+        }
+        out.append("=== FIM NFC-V PROBE ===\n");
+    }
+
+    private static byte[] transceive(NfcV nfcV, String label, byte[] command, StringBuilder out) {
+        out.append("TX ").append(label).append(": ").append(Hex.bytes(command)).append('\n');
+        try {
+            byte[] response = nfcV.transceive(command);
+            out.append("RX ").append(label).append(": ").append(Hex.bytes(response));
+            if (isError(response)) {
+                out.append("  [ISO15693 ERROR");
+                if (response.length > 1) {
+                    out.append(String.format(Locale.US, " 0x%02X", response[1] & 0xFF));
+                }
+                out.append(']');
+            }
+            out.append('\n');
+            return response;
+        } catch (Exception e) {
+            out.append("RX ").append(label).append(": <")
+                    .append(e.getClass().getSimpleName()).append(": ")
+                    .append(e.getMessage()).append(">\n");
+            return null;
+        }
+    }
+
+    private static boolean isSuccess(byte[] response) {
+        return response != null && response.length > 0 && (response[0] & 0x01) == 0;
+    }
+
+    private static boolean isError(byte[] response) {
+        return response != null && response.length > 0 && (response[0] & 0x01) != 0;
+    }
+
+    private static SystemInfo parseSystemInfo(byte[] response, StringBuilder out) {
+        if (!isSuccess(response) || response.length < 10) {
+            out.append("System Information: indisponível ou resposta curta.\n");
+            return null;
+        }
+
+        int infoFlags = response[1] & 0xFF;
+        int p = 2;
+        byte[] uid = Arrays.copyOfRange(response, p, p + 8);
+        p += 8;
+
+        out.append(String.format(Locale.US, "System info flags: 0x%02X%n", infoFlags));
+        out.append("System UID (raw response order): ").append(Hex.bytes(uid)).append('\n');
+
+        Integer dsfid = null;
+        Integer afi = null;
+        Integer blockCount = null;
+        Integer blockSize = null;
+        Integer icReference = null;
+
+        if ((infoFlags & 0x01) != 0 && p < response.length) dsfid = response[p++] & 0xFF;
+        if ((infoFlags & 0x02) != 0 && p < response.length) afi = response[p++] & 0xFF;
+        if ((infoFlags & 0x04) != 0 && p + 1 < response.length) {
+            blockCount = (response[p++] & 0xFF) + 1;
+            blockSize = (response[p++] & 0x1F) + 1;
+        }
+        if ((infoFlags & 0x08) != 0 && p < response.length) icReference = response[p] & 0xFF;
+
+        if (dsfid != null) out.append(String.format(Locale.US, "System DSFID: 0x%02X%n", dsfid));
+        if (afi != null) out.append(String.format(Locale.US, "System AFI: 0x%02X%n", afi));
+        if (blockCount != null && blockSize != null) {
+            out.append("Memory: ").append(blockCount).append(" blocks x ")
+                    .append(blockSize).append(" bytes = ")
+                    .append(blockCount * blockSize).append(" bytes\n");
+        }
+        if (icReference != null) {
+            out.append(String.format(Locale.US, "IC reference: 0x%02X%n", icReference));
+        }
+
+        return new SystemInfo(blockCount == null ? -1 : blockCount,
+                blockSize == null ? -1 : blockSize);
+    }
+
+    private static final class SystemInfo {
+        final int blockCount;
+        final int blockSize;
+
+        SystemInfo(int blockCount, int blockSize) {
+            this.blockCount = blockCount;
+            this.blockSize = blockSize;
+        }
     }
 
     private static void inspectUltralight(Tag tag, StringBuilder out) {
