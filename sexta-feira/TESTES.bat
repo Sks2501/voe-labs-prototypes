@@ -2,9 +2,11 @@
 setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
-if not exist ".venv\Scripts\python.exe" (
-  echo Execute instalar_windows.bat primeiro.
+set "SEXTA_RUNTIME=%~dp0.runtime"
+if not "%~1"=="" set "SEXTA_RUNTIME=%~1"
+if not exist "%SEXTA_RUNTIME%\venv\Scripts\python.exe" (
+  echo Ambiente virtual nao encontrado. Informe a pasta runtime como primeiro argumento.
   exit /b 1
 )
-".venv\Scripts\python.exe" -m unittest discover -s tests -v
+"%SEXTA_RUNTIME%\venv\Scripts\python.exe" -m unittest discover -s tests -v
 exit /b %errorlevel%

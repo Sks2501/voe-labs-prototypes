@@ -1,70 +1,23 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080d19">
-  <meta name="description" content="Assistente SEXTA-FEIRA, gratuita e executada localmente com o GPT-2 da OpenAI.">
-  <title>SEXTA-FEIRA | Assistente local</title>
-  <link rel="stylesheet" href="/styles.css">
-  <script src="/app.js" defer></script>
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#080d19"><meta name="description" content="SEXTA-FEIRA: assistente pessoal experimental, privada e local."><title>SEXTA-FEIRA | Assistente local</title><link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script></head>
 <body>
-  <header class="top">
-    <div class="mark" aria-hidden="true">S</div>
-    <div class="brand">
-      <h1>SEXTA-FEIRA</h1>
-      <p>Assistente pessoal · GPT-2 OpenAI · local</p>
-    </div>
-    <span class="status" id="status" aria-live="polite">Desconectada</span>
-  </header>
-  <main>
-    <section class="panel chat">
-      <h2>Conversa</h2>
-      <div class="auth">
-        <label for="token">Token de acesso mostrado no terminal</label>
-        <div class="auth-row">
-          <input id="token" type="password" autocomplete="off" spellcheck="false">
-          <button type="button" id="connect">Conectar</button>
-        </div>
-      </div>
-      <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Histórico da conversa"></div>
-      <form id="chat-form" class="compose">
-        <label for="prompt" class="sr">Mensagem para a SEXTA-FEIRA</label>
-        <textarea id="prompt" rows="2" maxlength="1600" placeholder="Digite sua mensagem..." required></textarea>
-        <button type="submit" id="send">Enviar</button>
-      </form>
-      <div class="control-line">
-        <label><input type="checkbox" id="speak"> Ler respostas em voz alta (voz do dispositivo)</label>
-        <button class="quiet" id="stop-speech" type="button">Silenciar</button>
-      </div>
-    </section>
-    <aside class="side">
-      <section class="panel">
-        <h2>Memórias</h2>
-        <p class="muted">Salve fatos importantes manualmente. Você pode apagá-los quando quiser.</p>
-        <form id="memory-form" class="stack">
-          <label for="memory" class="sr">Nova memória</label>
-          <input id="memory" maxlength="480" required placeholder="O que devo lembrar?">
-          <button type="submit">Salvar memória</button>
-        </form>
-        <ul id="memories" class="entries"></ul>
-      </section>
-      <section class="panel">
-        <h2>Tarefas</h2>
-        <form id="task-form" class="stack">
-          <label for="task" class="sr">Nova tarefa</label>
-          <input id="task" maxlength="480" required placeholder="O que precisa fazer?">
-          <button type="submit">Adicionar tarefa</button>
-        </form>
-        <ul id="tasks" class="entries"></ul>
-      </section>
-    </aside>
-  </main>
-  <footer>
-    Dados armazenados no computador. Os pesos são do GPT-2 da OpenAI;
-    esta personalização é independente, não é o ChatGPT oficial.
-    <span id="notice" role="status" aria-live="polite"></span>
-  </footer>
-</body>
-</html>
+<header class="top"><div class="mark" aria-hidden="true">S</div><div class="brand"><h1>SEXTA-FEIRA</h1><p>Seu espaço privado · OpenAI GPT-2 124M</p></div><span class="status" id="status" aria-live="polite">Desconectada</span><button id="logout" type="button" class="quiet" hidden>Sair</button></header>
+<main>
+<section class="panel chat" aria-labelledby="chat-title"><div class="section-heading"><h2 id="chat-title">Conversa</h2><span class="tag">Execução local</span></div>
+<form id="auth-form" class="auth"><label for="token">Token de acesso privado</label><p class="muted">Use o token do arquivo privado de configuração do servidor. Ele permanece apenas na memória desta página.</p><div class="auth-row"><input id="token" type="password" autocomplete="off" spellcheck="false" required aria-label="Token de acesso"><select id="role" aria-label="Tipo de sessão"><option value="user">Usuário</option><option value="admin">Administrador</option></select><button type="submit" id="connect">Entrar</button></div></form>
+<div class="messages" id="messages" role="log" aria-live="polite" aria-label="Histórico da conversa"><article class="welcome"><span class="welcome-symbol" aria-hidden="true">✧</span><h3>Olá, sou a SEXTA-FEIRA.</h3><p>Conecte-se para conversar, organizar tarefas e guardar o que você escolher.</p><p class="muted">O GPT-2 é experimental e pode gerar informações incorretas. Ações são executadas apenas pelas ferramentas autorizadas.</p></article></div>
+<div id="processing" class="processing" hidden role="status"><span class="pulse" aria-hidden="true"></span>Processando no servidor local…</div>
+<form id="chat-form" class="compose"><label for="prompt" class="sr">Mensagem para a SEXTA-FEIRA</label><textarea id="prompt" rows="2" maxlength="1600" placeholder="Digite sua mensagem…" required disabled></textarea><button type="submit" id="send" disabled>Enviar</button></form>
+<p class="muted command-hint">Ferramentas locais: <code>/hora</code>, <code>/tarefas</code>, <code>/memorias</code>, <code>/tarefa texto</code> e <code>/lembrar texto</code>.</p>
+<div class="control-line"><label><input type="checkbox" id="speak"> Ler respostas com voz local</label><button class="quiet" id="stop-speech" type="button">Silenciar</button><button class="quiet" type="button" disabled aria-describedby="voice-note">Microfone indisponível</button></div><p id="voice-note" class="muted">A leitura usa apenas vozes identificadas pelo navegador como locais. Reconhecimento de fala local não foi instalado; o microfone não é capturado.</p>
+</section>
+<aside class="side">
+<section class="panel"><h2>Memórias</h2><p id="memories-count" class="muted"></p><p class="muted">Somente o que você salvar aqui entra nas memórias permanentes.</p><form id="memory-form" class="stack"><label for="memory" class="sr">Nova memória</label><input id="memory" maxlength="480" required placeholder="O que devo lembrar?" disabled><button type="submit" disabled>Salvar memória</button></form><ul id="memories" class="entries"><li class="empty">Entre para consultar suas memórias.</li></ul><button id="memories-more" type="button" class="quiet" hidden>Carregar memórias anteriores</button></section>
+<section class="panel"><h2>Tarefas</h2><p id="tasks-count" class="muted"></p><form id="task-form" class="stack"><label for="task" class="sr">Nova tarefa</label><input id="task" maxlength="480" required placeholder="O que precisa fazer?" disabled><button type="submit" disabled>Adicionar tarefa</button></form><ul id="tasks" class="entries"><li class="empty">Suas tarefas aparecerão aqui.</li></ul><button id="tasks-more" type="button" class="quiet" hidden>Carregar tarefas anteriores</button></section>
+<section class="panel"><h2>Modelo e desempenho</h2><dl id="model-status" class="metrics"><dt>Modelo</dt><dd>GPT-2 124M</dd><dt>Estado</dt><dd>Conecte-se para consultar</dd><dt>Dispositivo</dt><dd>CPU</dd></dl><button id="refresh-status" type="button" class="quiet" disabled>Atualizar estado</button><p class="muted">Sem API comercial de inferência. O estado informado vem do servidor.</p></section>
+<section class="panel"><h2>Configurações e privacidade</h2><label class="field" for="voice-rate">Velocidade da voz <select id="voice-rate"><option value="0.9">Lenta</option><option value="1" selected>Normal</option><option value="1.15">Rápida</option></select></label><div class="actions"><button id="export" type="button" class="quiet" disabled>Exportar meus dados</button><button id="history" type="button" class="quiet" disabled>Carregar histórico</button></div><p class="muted">Conversas, tarefas e memórias ficam no SQLite do servidor. Exportações contêm dados privados: guarde-as com cuidado. Nenhum token é salvo no armazenamento do navegador.</p></section>
+</aside>
+</main>
+<footer><span id="notice" role="status" aria-live="polite">Pronta para uma conexão privada.</span><p>Personalização independente baseada no código e nos pesos originais do GPT-2 da OpenAI. Não é o ChatGPT. A síntese de voz depende de uma voz local no seu dispositivo.</p></footer>
+</body></html>
