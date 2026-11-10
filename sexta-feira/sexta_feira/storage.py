@@ -1,24 +1,51 @@
 """Persistência SQLite local, transacional e com conexões independentes."""
 from __future__ import annotations
 import sqlite3
+import json
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from .settings import DB_PATH, MAX_TEXT_LENGTH
+
+MEMORY_LIMIT = 100
+TASK_LIMIT = 200
+EXPORT_MAX_BYTES = 5 * 1024 * 1024
+EXPORT_MAX_ROWS = 10000
+
+class CapacityError(RuntimeError):
+    """Explicit capacity protects RAM and keeps records visible in the default UI."""
+    pass
+
+class ExportTooLarge(RuntimeError):
+    pass
 
 def cleaned(value: str, limit: int = MAX_TEXT_LENGTH) -> str:
     if not isinstance(value, str):
         raise ValueError("O valor precisa ser texto.")
     result = value.strip()
-    if not result or len(result) > limit:
+    if not result or len(result) > limit or "\x00" in result:
         raise ValueError(f"O texto deve ter entre 1 e {limit} caracteres.")
+    return result
+
+def identifier(value) -> int:
+    if isinstance(value, bool):
+        raise ValueError("Identificador inválido.")
+    try:
+        result = int(value)
+    except (ValueError, TypeError, OverflowError):
+        raise ValueError("Identificador inválido.") from None
+    if str(result) != str(value) or not 0 < result < 2**63:
+        raise ValueError("Identificador inválido.")
     return result
 
 class Storage:
     def __init__(self, path: Path = DB_PATH) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._check_schema_version()
         with self._connect() as db:
             db.executescript("""
+                BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS messages (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
                   role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
@@ -33,14 +60,52 @@ class Storage:
                   content TEXT NOT NULL, completed INTEGER NOT NULL DEFAULT 0,
                   created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS preferences (
+                  key TEXT PRIMARY KEY, value TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS metadata (
+                  key TEXT PRIMARY KEY, value TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS sessions (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  token_hash TEXT NOT NULL UNIQUE,
+                  role TEXT NOT NULL CHECK(role IN ('user','admin')),
+                  created_at TEXT NOT NULL, expires_at REAL NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
+                INSERT INTO metadata(key,value) VALUES ('schema_version','2')
+                  ON CONFLICT(key) DO UPDATE SET value=excluded.value;
+                COMMIT;
             """)
 
-    def _connect(self) -> sqlite3.Connection:
-        db = sqlite3.connect(str(self.path), timeout=15)
+    def _check_schema_version(self) -> None:
+        # Refuse newer or corrupt versions before changing even journal settings.
+        if not self.path.exists():
+            return
+        db = sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)
+        try:
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").fetchone():
+                row = db.execute("SELECT value FROM metadata WHERE key='schema_version'").fetchone()
+                if row is not None:
+                    version = int(row[0])
+                    if version < 1 or version > 2:
+                        raise ValueError("Versão do banco não suportada; preserve os dados e use a versão correspondente do aplicativo.")
+        finally:
+            db.close()
+
+    @contextmanager
+    def _connect(self):
+        db = sqlite3.connect(str(self.path), timeout=5)
         db.row_factory = sqlite3.Row
-        db.execute("PRAGMA busy_timeout=15000")
+        db.execute("PRAGMA busy_timeout=5000")
         db.execute("PRAGMA journal_mode=WAL")
-        return db
+        db.execute("PRAGMA foreign_keys=ON")
+        db.execute("PRAGMA cache_size=-2048")
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def save_message(self, role: str, text: str) -> int:
         if role not in ("user", "assistant"):
@@ -52,49 +117,200 @@ class Storage:
                 (role, text, datetime.now(timezone.utc).isoformat()))
             return int(cur.lastrowid)
 
-    def history(self, limit: int = 8) -> list[dict]:
-        limit = max(1, min(30, int(limit)))
+    def history(self, limit: int = 8, before: int | None = None) -> list[dict]:
+        limit = max(1, min(100, int(limit)))
         with self._connect() as db:
             rows = db.execute(
-                "SELECT id,role,content,created_at FROM messages ORDER BY id DESC LIMIT ?",
-                (limit,)).fetchall()
+                "SELECT id,role,content,created_at FROM messages " +
+                ("WHERE id<? " if before is not None else "") + "ORDER BY id DESC LIMIT ?",
+                (identifier(before), limit) if before is not None else (limit,)).fetchall()
         return [dict(row) for row in reversed(rows)]
 
     def add_memory(self, text: str) -> int:
+        text = cleaned(text, 480)
         with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT count(*) FROM memories").fetchone()[0] >= MEMORY_LIMIT:
+                raise CapacityError("Limite de 100 memórias atingido. Exporte ou exclua uma memória antes de adicionar outra.")
             cur = db.execute(
                 "INSERT INTO memories(content,created_at) VALUES (?,?)",
-                (cleaned(text, 480), datetime.now(timezone.utc).isoformat()))
+                (text, datetime.now(timezone.utc).isoformat()))
             return int(cur.lastrowid)
 
-    def memories(self) -> list[dict]:
+    def memories(self, limit: int = 100, before: int | None = None) -> list[dict]:
+        limit = max(1, min(100, int(limit)))
         with self._connect() as db:
             rows = db.execute(
-                "SELECT id,content,created_at FROM memories ORDER BY id DESC LIMIT 100"
-            ).fetchall()
+                "SELECT id,content,created_at FROM memories " +
+                ("WHERE id<? " if before is not None else "") + "ORDER BY id DESC LIMIT ?",
+                (identifier(before), limit) if before is not None else (limit,)).fetchall()
         return [dict(row) for row in rows]
 
     def delete_memory(self, item_id: int) -> bool:
         with self._connect() as db:
-            cur = db.execute("DELETE FROM memories WHERE id=?", (int(item_id),))
+            cur = db.execute("DELETE FROM memories WHERE id=?", (identifier(item_id),))
             return cur.rowcount > 0
 
     def add_task(self, text: str) -> int:
+        text = cleaned(text, 480)
         with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT count(*) FROM tasks").fetchone()[0] >= TASK_LIMIT:
+                raise CapacityError("Limite de 200 tarefas atingido. Exporte ou exclua uma tarefa antes de adicionar outra.")
             cur = db.execute(
                 "INSERT INTO tasks(content,created_at) VALUES (?,?)",
-                (cleaned(text, 480), datetime.now(timezone.utc).isoformat()))
+                (text, datetime.now(timezone.utc).isoformat()))
             return int(cur.lastrowid)
 
-    def tasks(self) -> list[dict]:
+    def tasks(self, limit: int = 200, before: int | None = None) -> list[dict]:
+        limit = max(1, min(200, int(limit)))
         with self._connect() as db:
             rows = db.execute(
-                "SELECT id,content,completed,created_at FROM tasks ORDER BY completed,id DESC LIMIT 200"
-            ).fetchall()
+                "SELECT id,content,completed,created_at FROM tasks " +
+                ("WHERE id<? " if before is not None else "") + "ORDER BY id DESC LIMIT ?",
+                (identifier(before), limit) if before is not None else (limit,)).fetchall()
         return [dict(row) for row in rows]
+
+    def counts(self) -> dict:
+        with self._connect() as db:
+            return {name: db.execute("SELECT count(*) FROM " + name).fetchone()[0]
+                    for name in ("messages", "memories", "tasks")}
 
     def toggle_task(self, item_id: int) -> bool:
         with self._connect() as db:
             cur = db.execute(
-                "UPDATE tasks SET completed=1-completed WHERE id=?", (int(item_id),))
+                "UPDATE tasks SET completed=1-completed WHERE id=?", (identifier(item_id),))
             return cur.rowcount > 0
+
+    def save_exchange(self, message: str, reply: str) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        rows = [("user", cleaned(message, 1600), now), ("assistant", cleaned(reply, 6000), now)]
+        with self._connect() as db:
+            db.executemany("INSERT INTO messages(role,content,created_at) VALUES (?,?,?)", rows)
+
+    def delete_history(self) -> int:
+        with self._connect() as db:
+            return db.execute("DELETE FROM messages").rowcount
+
+    def update_memory(self, item_id: int, content: str) -> bool:
+        with self._connect() as db:
+            return db.execute("UPDATE memories SET content=? WHERE id=?",
+                              (cleaned(content, 480), identifier(item_id))).rowcount > 0
+
+    def update_task(self, item_id: int, *, content=None, completed=None) -> bool:
+        if content is None and completed is None:
+            raise ValueError("Informe content ou completed.")
+        fields, args = [], []
+        if content is not None:
+            fields.append("content=?")
+            args.append(cleaned(content, 480))
+        if completed is not None:
+            if not isinstance(completed, bool):
+                raise ValueError("completed deve ser booleano.")
+            fields.append("completed=?")
+            args.append(int(completed))
+        args.append(identifier(item_id))
+        with self._connect() as db:
+            return db.execute("UPDATE tasks SET " + ",".join(fields) + " WHERE id=?", args).rowcount > 0
+
+    def delete_task(self, item_id: int) -> bool:
+        with self._connect() as db:
+            return db.execute("DELETE FROM tasks WHERE id=?", (identifier(item_id),)).rowcount > 0
+
+    def preferences(self) -> dict:
+        defaults = {"voice_enabled": False, "voice_rate": 1.0, "language": "pt-BR"}
+        with self._connect() as db:
+            for row in db.execute("SELECT key,value FROM preferences"):
+                defaults[row["key"]] = json.loads(row["value"])
+        return defaults
+
+    def set_preferences(self, values: dict) -> dict:
+        if not isinstance(values, dict) or not values or set(values) - {"voice_enabled", "voice_rate", "language"}:
+            raise ValueError("Preferências desconhecidas ou vazias.")
+        if "voice_enabled" in values and not isinstance(values["voice_enabled"], bool):
+            raise ValueError("voice_enabled deve ser booleano.")
+        rate = values.get("voice_rate", 1.0)
+        if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not 0.5 <= rate <= 2.0:
+            raise ValueError("voice_rate deve estar entre 0.5 e 2.0.")
+        if values.get("language", "pt-BR") != "pt-BR":
+            raise ValueError("Idioma suportado: pt-BR.")
+        with self._connect() as db:
+            db.executemany("INSERT INTO preferences(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                           [(k, json.dumps(v)) for k, v in values.items()])
+        return self.preferences()
+
+    def create_session(self, token_hash: str, role: str, expires_at: float, now: float) -> int:
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM sessions WHERE expires_at<=?", (now,))
+            if db.execute("SELECT count(*) FROM sessions").fetchone()[0] >= 100:
+                raise ValueError("Limite de sessões atingido; revogue uma sessão.")
+            cur = db.execute("INSERT INTO sessions(token_hash,role,created_at,expires_at) VALUES (?,?,?,?)",
+                             (token_hash, role, datetime.now(timezone.utc).isoformat(), expires_at))
+            return int(cur.lastrowid)
+
+    def find_session(self, token_hash: str, now: float) -> dict | None:
+        with self._connect() as db:
+            row = db.execute("SELECT id,role,expires_at FROM sessions WHERE token_hash=? AND expires_at>?",
+                             (token_hash, now)).fetchone()
+        return dict(row) if row else None
+
+    def sessions(self, now: float) -> list[dict]:
+        with self._connect() as db:
+            rows = db.execute("SELECT id,role,created_at,expires_at FROM sessions WHERE expires_at>? ORDER BY id DESC LIMIT 100",
+                              (now,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def revoke_session(self, *, token_hash=None, item_id=None) -> bool:
+        with self._connect() as db:
+            if token_hash:
+                return db.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash,)).rowcount > 0
+            return db.execute("DELETE FROM sessions WHERE id=?", (identifier(item_id),)).rowcount > 0
+
+    def export(self) -> dict:
+        result = {"schema_version": 2, "exported_at": datetime.now(timezone.utc).isoformat()}
+        with self._connect() as db:
+            # Estimate before materializing rows, in the same SQLite snapshot.
+            # JSON can expand one control byte into six bytes; allow that worst case
+            # plus generous object/key/integer overhead for each row.
+            db.execute("BEGIN")
+            estimated = 512
+            for name in ("messages", "memories", "tasks"):
+                text_columns = ("content", "created_at", "role") if name == "messages" else ("content", "created_at")
+                lengths = "+".join("length(CAST(" + column + " AS BLOB))" for column in text_columns)
+                count, size = db.execute("SELECT count(*),coalesce(sum(" + lengths + "),0) FROM " + name).fetchone()
+                if count > EXPORT_MAX_ROWS:
+                    raise ExportTooLarge("Exportação excede 10.000 registros por tabela. Use backup administrativo.")
+                estimated += size * 6 + count * 256
+            pref_count, pref_size = db.execute("SELECT count(*),coalesce(sum(length(CAST(key AS BLOB))+length(CAST(value AS BLOB))),0) FROM preferences").fetchone()
+            estimated += pref_size * 6 + pref_count * 128
+            if estimated > EXPORT_MAX_BYTES:
+                raise ExportTooLarge("Exportação JSON excede o limite conservador de 5 MiB. Use backup administrativo.")
+            for name in ("messages", "memories", "tasks"):
+                columns = {"messages": "id,role,content,created_at", "memories": "id,content,created_at",
+                           "tasks": "id,content,completed,created_at"}[name]
+                result[name] = [dict(row) for row in db.execute("SELECT " + columns + " FROM " + name + " ORDER BY id")]
+            preferences = {"voice_enabled": False, "voice_rate": 1.0, "language": "pt-BR"}
+            for row in db.execute("SELECT key,value FROM preferences"):
+                preferences[row["key"]] = json.loads(row["value"])
+            result["preferences"] = preferences
+        return result
+
+    def integrity(self) -> str:
+        with self._connect() as db:
+            return db.execute("PRAGMA integrity_check").fetchone()[0]
+
+    def backup(self, destination: Path) -> Path:
+        destination = Path(destination)
+        if destination.exists() or destination.resolve() == self.path.resolve():
+            raise ValueError("O destino do backup já existe.")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as source:
+            target = sqlite3.connect(str(destination))
+            try:
+                source.backup(target, pages=128)
+                if target.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                    raise ValueError("Falha de integridade no backup.")
+            finally:
+                target.close()
+        return destination

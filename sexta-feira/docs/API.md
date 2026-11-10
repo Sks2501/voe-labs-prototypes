@@ -1,0 +1,102 @@
+# API privada v1
+
+A aplicação atende **um único proprietário**. Sessões de usuário e administrador
+compartilham os dados pessoais desse proprietário; não é um serviço multitenant.
+O processo escuta em `127.0.0.1:8765`. Publicação requer HTTPS e controle de acesso
+externo conforme [CLOUDFLARE.md](CLOUDFLARE.md).
+
+Todas as rotas `/api/v1`, inclusive saúde e OpenAPI, exigem
+`Authorization: Bearer <credencial>`. Nunca coloque a credencial na URL. O token
+da instalação vem de um arquivo privado criado por `python -m sexta_feira init`.
+O servidor não imprime o segredo. A interface de login e seus arquivos estáticos
+podem ser carregados sem autenticação; não contêm dados pessoais.
+
+`POST /api/v1/sessions` recebe `{ "role": "user" }` ou `admin`, autenticado por uma
+credencial válida. A resposta contém um novo `token`, `id`, `role` e `expires_at`
+(timestamp Unix). O token é mostrado somente nesta resposta e o SQLite guarda seu
+SHA-256. Sessões expiram em 12 horas e o limite é 100 sessões simultâneas. Um
+usuário não pode criar uma sessão administrativa. A interface guarda a sessão
+somente na memória da página; fechar/recarregar a página perde a credencial local.
+O botão Sair também revoga a sessão no servidor.
+
+Não há cookies de autenticação. Cada chamada depende do cabeçalho Bearer, sem
+credenciais ambiente que possam ser enviadas por um formulário CSRF. Origens e
+hosts são validados e a API não libera CORS. Para um túnel, configure uma única
+`SEXTA_PUBLIC_ORIGIN` HTTPS exata. Cabeçalhos encaminhados não concedem privilégios.
+
+| Rota depois de `/api/v1` | Métodos | Uso |
+| --- | --- | --- |
+| `/health` | GET | Disponibilidade autenticada, sem diagnóstico administrativo |
+| `/state` | GET | Histórico recente, memórias, tarefas, preferências e estado do modelo |
+| `/model` | GET | Estado real do motor; não força carregamento dos pesos |
+| `/conversations` | POST | `{ "message": "texto" }`; GPT-2 local ou comando explícito |
+| `/history` | GET, DELETE | Página de histórico ou exclusão do histórico |
+| `/memories` | GET, POST | Página de memórias; criação com `{ "content": "texto" }` |
+| `/memories/{id}` | PATCH, DELETE | Correção com `content` ou exclusão |
+| `/tasks` | GET, POST | Página de tarefas; criação com `content` |
+| `/tasks/{id}` | PATCH, DELETE | Atualizar `content`/`completed` booleano ou excluir |
+| `/preferences` | GET, PATCH | `voice_enabled`, `voice_rate` entre 0.5 e 2, `language: pt-BR` |
+| `/sessions` | POST | Criar sessão com privilégio igual ou inferior ao atual |
+| `/sessions` | GET | Administrador: inventário sem tokens ou hashes |
+| `/sessions/current` | DELETE | Revogar a sessão atual; não revoga token da instalação |
+| `/sessions/{id}` | DELETE | Administrador: revogar uma sessão |
+| `/tools` | POST | Ferramenta explícita com `name` e objeto `parameters` |
+| `/metrics` | GET | Administrador: CPU, RAM, disco, requisições e fila |
+| `/export` | GET | Exportação JSON de dados pessoais, sem sessões/credenciais |
+| `/admin/integrity` | GET | Administrador: `PRAGMA integrity_check` |
+| `/admin/backup` | POST | Administrador: corpo `{}`; backup SQLite consistente |
+| `/openapi.json` | GET | Especificação OpenAPI 3.1 autocontida |
+
+As páginas de histórico/memórias/tarefas aceitam `limit` e `before` (ID exclusivo).
+O máximo é 100 mensagens, 100 memórias ou 200 tarefas por página. Para buscar uma
+página anterior, envie `before` igual ao menor ID da página atual. Histórico vem
+em ordem cronológica dentro da página; memórias/tarefas vêm em ID decrescente.
+Memórias/tarefas retornam também `total`. `/state` informa `counts` e `limits`.
+
+Novas memórias têm limite de 100 registros; tarefas têm limite de 200, incluindo
+as concluídas. A API responde 409 ao atingir o limite, sem substituir registros.
+Dados legados acima desses limites são preservados e continuam consultáveis por
+paginação, corrigíveis, exportáveis e excluíveis.
+
+## Comandos explícitos no chat
+
+Somente mensagens do usuário com estes prefixos acionam ferramentas:
+
+| Comando | Ferramenta | Efeito |
+| --- | --- | --- |
+| `/hora` | `system_time` | Hora e fuso do servidor |
+| `/tarefas` | `list_tasks` | Consulta tarefas |
+| `/memorias` | `list_memories` | Consulta memórias explicitamente salvas |
+| `/tarefa texto` | `create_task` | Cria a tarefa informada |
+| `/lembrar texto` | `save_memory` | Salva a memória informada |
+
+A resposta traz `source: tool`, `generated: false` e `action_executed: true` depois
+da execução real. Listas no chat mostram até dez registros; use a lista da interface
+para consultar os demais. Conversas normais trazem `source: gpt2`, `generated: true`
+e `action_executed: false`. Nenhum texto produzido pelo GPT-2 volta a ser analisado
+como comando. O histórico guarda o conteúdo e o papel; a fonte por mensagem ainda
+não é persistida. Não há agendador de notificações nem execução de shell.
+
+## Limites e proteção dos dados
+
+- Corpo JSON até 8192 bytes; mensagem até 1600 caracteres; memórias/tarefas até 480.
+- 60 requisições por minuto por IP de conexão e até 16 conexões HTTP em atendimento.
+  Um túnel pode fazer os clientes compartilharem o mesmo IP local e esse limite.
+- A inferência tem sua própria fila pequena e somente um trabalhador de CPU.
+- Exportação: uma por vez; estimativa conservadora máxima de 5 MiB de JSON e
+  10.000 registros por tabela, validada antes de materializar dados. O snapshot
+  SQLite mantém a exportação consistente. Arquivos maiores exigem backup admin.
+- Backups: uma criação por vez, máximo de dez arquivos e reserva mínima de 64 MiB
+  além do espaço estimado necessário. Nenhum backup antigo é apagado automaticamente.
+- Exclusão de histórico/memórias/tarefas é uma operação lógica no banco corrente.
+  Backups anteriores ainda podem conter dados excluídos; gerencie sua retenção.
+- Logs têm rotação de 1 MiB e três cópias, sem URLs, tokens ou conteúdo das conversas.
+- SQLite não é criptografado pela aplicação: a proteção depende das ACLs privadas
+  e do armazenamento/backup do Windows. Esquemas mais novos são recusados antes
+  de qualquer migração; a versão atual do esquema é 2.
+
+Erros têm `{ "error": "mensagem", "code": "identificador" }`. Principais status:
+400 validação, 401 autenticação, 403 privilégio/origem, 404 inexistente, 409 limite
+de dados, 413 corpo/exportação excessivo, 415 tipo de conteúdo, 421 host inválido,
+429 frequência/fila/exportação ocupada, 503 indisponibilidade e 504 timeout de
+inferência. Erros internos não devolvem caminhos, detalhes de exceções ou segredos.
