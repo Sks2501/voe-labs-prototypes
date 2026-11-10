@@ -1,0 +1,9 @@
+__pycache__
+.mypy_cache/
+models/
+
+.venv/
+__pycache__/
+*.pyc
+models/
+.cache/
