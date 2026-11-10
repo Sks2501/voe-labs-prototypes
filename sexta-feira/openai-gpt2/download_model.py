@@ -1,28 +1,19 @@
-import os
+"""Hardened SEXTA-FEIRA wrapper; the original script is in upstream-original/."""
+import argparse
+from pathlib import Path
 import sys
-import requests
-from tqdm import tqdm
 
-if len(sys.argv) != 2:
-    print('You must enter the model name as a parameter, e.g.: download_model.py 124M')
-    sys.exit(1)
 
-model = sys.argv[1]
+def main():
+    parser = argparse.ArgumentParser(description='Download unchanged official OpenAI checkpoint files')
+    parser.add_argument('model', choices=('124M', '355M'))
+    parser.add_argument('--models-dir', type=Path, default=Path('models'))
+    args = parser.parse_args()
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from sexta_feira.weights import download_weights
+    manifest = download_weights(args.models_dir, args.model)
+    print('Verified official model: %s (%d files)' % (args.model, len(manifest['files'])))
 
-subdir = os.path.join('models', model)
-if not os.path.exists(subdir):
-    os.makedirs(subdir)
-subdir = subdir.replace('\\','/') # needed for Windows
 
-for filename in ['checkpoint','encoder.json','hparams.json','model.ckpt.data-00000-of-00001', 'model.ckpt.index', 'model.ckpt.meta', 'vocab.bpe']:
-
-    r = requests.get("https://openaipublic.blob.core.windows.net/gpt-2/" + subdir + "/" + filename, stream=True)
-
-    with open(os.path.join(subdir, filename), 'wb') as f:
-        file_size = int(r.headers["content-length"])
-        chunk_size = 1000
-        with tqdm(ncols=100, desc="Fetching " + filename, total=file_size, unit_scale=True) as pbar:
-            # 1k for chunk_size, since Ethernet packet size is around 1500 bytes
-            for chunk in r.iter_content(chunk_size=chunk_size):
-                f.write(chunk)
-                pbar.update(chunk_size)
+if __name__ == '__main__':
+    main()

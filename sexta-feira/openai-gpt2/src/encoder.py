@@ -34,6 +34,8 @@ def get_pairs(word):
     Word is represented as tuple of symbols (symbols being variable-length strings).
     """
     pairs = set()
+    if not word:
+        return pairs
     prev_char = word[0]
     for char in word[1:]:
         pairs.add((prev_char, char))
@@ -41,7 +43,9 @@ def get_pairs(word):
     return pairs
 
 class Encoder:
-    def __init__(self, encoder, bpe_merges, errors='replace'):
+    def __init__(self, encoder, bpe_merges, errors='replace', max_cache_entries=4096):
+        if isinstance(max_cache_entries, bool) or not isinstance(max_cache_entries, int) or not 0 <= max_cache_entries <= 65536:
+            raise ValueError('max_cache_entries must be an integer between 0 and 65536')
         self.encoder = encoder
         self.decoder = {v:k for k,v in self.encoder.items()}
         self.errors = errors # how to handle errors in decoding
@@ -49,12 +53,16 @@ class Encoder:
         self.byte_decoder = {v:k for k, v in self.byte_encoder.items()}
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = OrderedDict()
-        self.max_cache_entries = 8192
+        self.max_cache_entries = max_cache_entries
 
         # Should haved added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
         self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
 
     def bpe(self, token):
+        if not isinstance(token, str):
+            raise TypeError('BPE token must be text')
+        if not token:
+            return ''
         if token in self.cache:
             self.cache.move_to_end(token)
             return self.cache[token]
@@ -93,12 +101,18 @@ class Encoder:
             else:
                 pairs = get_pairs(word)
         word = ' '.join(word)
-        self.cache[token] = word
-        if len(self.cache) > self.max_cache_entries:
-            self.cache.popitem(last=False)
+        if self.max_cache_entries:
+            self.cache[token] = word
+            if len(self.cache) > self.max_cache_entries:
+                self.cache.popitem(last=False)
         return word
 
+    def clear_cache(self):
+        self.cache.clear()
+
     def encode(self, text):
+        if not isinstance(text, str):
+            raise TypeError('Input must be text')
         bpe_tokens = []
         for token in re.findall(self.pat, text):
             token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
@@ -110,8 +124,10 @@ class Encoder:
         text = bytearray([self.byte_decoder[c] for c in text]).decode('utf-8', errors=self.errors)
         return text
 
-def get_encoder(model_name, models_dir):
-    with open(os.path.join(models_dir, model_name, 'encoder.json'), 'r') as f:
+def get_encoder(model_name, models_dir, max_cache_entries=4096):
+    if model_name not in ('124M', '355M', '774M', '1558M'):
+        raise ValueError('Unknown official GPT-2 model size')
+    with open(os.path.join(models_dir, model_name, 'encoder.json'), 'r', encoding='utf-8') as f:
         encoder = json.load(f)
     with open(os.path.join(models_dir, model_name, 'vocab.bpe'), 'r', encoding="utf-8") as f:
         bpe_data = f.read()
@@ -119,4 +135,5 @@ def get_encoder(model_name, models_dir):
     return Encoder(
         encoder=encoder,
         bpe_merges=bpe_merges,
+        max_cache_entries=max_cache_entries,
     )

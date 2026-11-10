@@ -1,0 +1,13 @@
+{
+  "repository": "https://github.com/openai/gpt-2",
+  "commit": "9b63575ef42771a015060c964af2c3da4cf7c8ab",
+  "sha256": {
+    "LICENSE": "0dbeda4bc78823b1d67ec0ee414d8690ee4cad826bc9c147b215adc3af202436",
+    "download_model.py": "4dbfd8369ee4ad07b1c481f9b8be686c180fec72da86c1785ac5aaaa8f56e47e",
+    "src/model.py": "2ff5065f5cac3dc93065f8a3f36eb013e407972a80abcd4ee6b89a7138a0d5a6",
+    "src/sample.py": "7a726916bdc416b296665b52ea7b87581152e16794c8eaff90bf4f89b1235771",
+    "src/encoder.py": "84caddd892377b74de8b61f1fdf2437de9dc025c2f3bc73a981edcb0605e4f9a",
+    "src/interactive_conditional_samples.py": "c2dda3c795148d661b15b8834d5fa8e7e129f179742bf87211bd43720aef9ea9",
+    "src/generate_unconditional_samples.py": "af012770d0e81744098739b87513ed39a4edc7116ce9c95fc138bafe1f9b8214"
+  }
+}

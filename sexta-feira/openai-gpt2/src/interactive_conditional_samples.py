@@ -42,7 +42,8 @@ def interact_model(
     models_dir = os.path.expanduser(os.path.expandvars(models_dir))
     if batch_size is None:
         batch_size = 1
-    assert nsamples % batch_size == 0
+    if batch_size < 1 or nsamples < 1 or nsamples % batch_size:
+        raise ValueError('nsamples must be positive and divisible by positive batch_size')
 
     enc = encoder.get_encoder(model_name, models_dir)
     hparams = model.default_hparams()
@@ -58,7 +59,7 @@ def interact_model(
         raise ValueError('temperature must be between 0 and 2')
     if length < 1 or length >= hparams.n_ctx:
         raise ValueError('generation length out of range')
-    config = tf.ConfigProto(device_count={'GPU': 0}, intra_op_parallelism_threads=4, inter_op_parallelism_threads=2)
+    config = tf.ConfigProto(device_count={'GPU': 0}, intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
     with tf.Session(graph=tf.Graph(), config=config) as sess:
         context = tf.placeholder(tf.int32, [batch_size, None])
         np.random.seed(seed)
@@ -75,7 +76,10 @@ def interact_model(
         saver.restore(sess, ckpt)
 
         while True:
-            raw_text = input("Model prompt >>> ")
+            try:
+                raw_text = input("Model prompt >>> ")
+            except (KeyboardInterrupt, EOFError):
+                break
             while not raw_text:
                 print('Prompt should not be empty!')
                 raw_text = input("Model prompt >>> ")

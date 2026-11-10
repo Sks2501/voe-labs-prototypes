@@ -1,0 +1,83 @@
+{
+  "measured_at_utc": "2026-11-10T20:36:23.282044+00:00",
+  "environment": "local Windows 11 development machine, not target Windows Server",
+  "python": "3.13.15",
+  "torch": "2.9.1+cpu",
+  "device": "cpu",
+  "threads": 1,
+  "context_limit": 512,
+  "generation_limit": 64,
+  "checkpoint": "OpenAI original 124M TensorFlow",
+  "available_ram_before_bytes": 2865401856,
+  "process_before": {
+    "working_set_bytes": 19034112,
+    "peak_working_set_bytes": 19169280,
+    "pagefile_usage_bytes": 11939840
+  },
+  "model_load_seconds": 2.6251,
+  "process_after_load": {
+    "working_set_bytes": 724189184,
+    "peak_working_set_bytes": 725495808,
+    "pagefile_usage_bytes": 806449152
+  },
+  "compatibility": {
+    "numpy_max_absolute_logit_difference": 3.814697265625e-05,
+    "cached_full_max_absolute_logit_difference": 6.103515625e-05,
+    "numpy_top1_matches": true,
+    "top1_public_prompt": " the",
+    "tensorflow_runtime_comparison": "not executed; validated against independent NumPy transcription and original tokenizer"
+  },
+  "runs": [
+    {
+      "prompt_name": "public_english",
+      "new_tokens": 64,
+      "wall_seconds": 3.9233,
+      "cpu_seconds": 3.875,
+      "tokens_per_second": 16.313,
+      "output_nonempty": true
+    },
+    {
+      "prompt_name": "public_portuguese",
+      "new_tokens": 64,
+      "wall_seconds": 4.1128,
+      "cpu_seconds": 4.0625,
+      "tokens_per_second": 15.561,
+      "output_nonempty": true
+    }
+  ],
+  "assistant_api_function": {
+    "wall_seconds": 4.4498,
+    "reply_nonempty": true,
+    "engine": {
+      "model": "small",
+      "loaded": true,
+      "loading": false,
+      "device": "cpu",
+      "cpu_threads": 1,
+      "context_tokens": 512,
+      "max_new_tokens": 64,
+      "queue_depth": 0,
+      "queue_limit": 2,
+      "processing": false,
+      "requests": 1,
+      "generated_tokens": 64,
+      "last_seconds": 4.449,
+      "consecutive_failures": 0,
+      "cooldown_seconds": 0,
+      "last_error_type": null,
+      "closed": false,
+      "memory_reserve_mb": 1024,
+      "local_only": true
+    }
+  },
+  "process_after_inference": {
+    "working_set_bytes": 740970496,
+    "peak_working_set_bytes": 741384192,
+    "pagefile_usage_bytes": 821182464
+  },
+  "available_ram_after_bytes": 2280652800,
+  "model_disk_bytes": 499735887,
+  "model_sha256": "2060c885360cc0cf41d7a6dbc4d24b5127aae20260c8b5ae521b5a6578407118",
+  "clean_shutdown": true,
+  "memory_measurement_note": "Repeated same 64-token public workload in a separate process with corrected ctypes pointer signatures; values below are from that repeat."
+}

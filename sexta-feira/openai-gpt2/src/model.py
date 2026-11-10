@@ -145,6 +145,10 @@ def positions_for(tokens, past_length):
 
 
 def model(hparams, X, past=None, scope='model', reuse=False):
+    if hparams.n_embd < 1 or hparams.n_head < 1 or hparams.n_embd % hparams.n_head:
+        raise ValueError('Embedding width must be divisible by the number of heads')
+    if hparams.n_ctx < 2 or hparams.n_layer < 1 or hparams.n_vocab < 1:
+        raise ValueError('Invalid GPT-2 dimensions')
     with tf.variable_scope(scope, reuse=reuse):
         results = {}
         batch, sequence = shape_list(X)
@@ -154,7 +158,8 @@ def model(hparams, X, past=None, scope='model', reuse=False):
         wte = tf.get_variable('wte', [hparams.n_vocab, hparams.n_embd],
                              initializer=tf.random_normal_initializer(stddev=0.02))
         past_length = 0 if past is None else tf.shape(past)[-2]
-        h = tf.gather(wte, X) + tf.gather(wpe, positions_for(X, past_length))
+        with tf.control_dependencies([tf.assert_less_equal(sequence + past_length, hparams.n_ctx)]):
+            h = tf.gather(wte, X) + tf.gather(wpe, positions_for(X, past_length))
 
         # Transformer
         presents = []

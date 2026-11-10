@@ -1,4 +1,5 @@
 import tensorflow as tf
+import math
 
 import model
 
@@ -41,6 +42,16 @@ def top_p_logits(logits, p):
 
 
 def sample_sequence(*, hparams, length, start_token=None, batch_size=None, context=None, temperature=1, top_k=0, top_p=1):
+    if isinstance(length, bool) or not isinstance(length, int) or not 1 <= length < hparams.n_ctx:
+        raise ValueError('length must be positive and below the context window')
+    if not isinstance(temperature, (int, float)) or not math.isfinite(temperature) or not 0 < temperature <= 2:
+        raise ValueError('temperature must be finite and between 0 and 2')
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or not 0 <= top_k <= hparams.n_vocab:
+        raise ValueError('top_k must be between 0 and vocabulary size')
+    if not isinstance(top_p, (int, float)) or not math.isfinite(top_p) or not 0 < top_p <= 1:
+        raise ValueError('top_p must be finite and in (0, 1]')
+    if batch_size is not None and (isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1):
+        raise ValueError('batch_size must be positive')
     if start_token is None:
         assert context is not None, 'Specify exactly one of start_token and context!'
     else:

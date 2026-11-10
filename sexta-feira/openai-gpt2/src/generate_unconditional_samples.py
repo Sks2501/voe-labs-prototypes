@@ -11,7 +11,7 @@ import model, sample, encoder
 def sample_model(
     model_name='124M',
     seed=None,
-    nsamples=0,
+    nsamples=1,
     batch_size=1,
     length=None,
     temperature=1,
@@ -41,17 +41,20 @@ def sample_model(
      (i.e. contains the <model_name> folder)
     """
     models_dir = os.path.expanduser(os.path.expandvars(models_dir))
+    if batch_size < 1 or nsamples < 1 or nsamples % batch_size:
+        raise ValueError('nsamples must be positive and divisible by positive batch_size')
     enc = encoder.get_encoder(model_name, models_dir)
     hparams = model.default_hparams()
     with open(os.path.join(models_dir, model_name, 'hparams.json')) as f:
         hparams.override_from_dict(json.load(f))
 
     if length is None:
-        length = hparams.n_ctx
-    elif length > hparams.n_ctx:
+        length = min(64, hparams.n_ctx - 1)
+    elif not 1 <= length < hparams.n_ctx:
         raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
-    with tf.Session(graph=tf.Graph()) as sess:
+    config = tf.ConfigProto(device_count={'GPU': 0}, intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+    with tf.Session(graph=tf.Graph(), config=config) as sess:
         np.random.seed(seed)
         tf.set_random_seed(seed)
 
@@ -67,10 +70,10 @@ def sample_model(
         saver.restore(sess, ckpt)
 
         generated = 0
-        while nsamples == 0 or generated < nsamples:
+        while generated < nsamples:
             out = sess.run(output)
             for i in range(batch_size):
-                generated += batch_size
+                generated += 1
                 text = enc.decode(out[i])
                 print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
                 print(text)
