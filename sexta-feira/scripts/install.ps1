@@ -9,6 +9,30 @@ param(
   [ValidatePattern('^$|^[0-9a-fA-F]{64}$')][string]$WinSWSha256 = ''
 )
 $ErrorActionPreference='Stop'
+function Get-SextaSourceRevision {
+  param([Parameter(Mandatory=$true)][string]$ProjectDirectory)
+  $fallback='source-package'
+  try {
+    # The project lives directly below its repository root. Never inherit an
+    # unrelated Git repository from a higher ancestor of an extracted package.
+    $expectedRoot=[IO.Path]::GetFullPath((Split-Path -Parent $ProjectDirectory)).TrimEnd('\')
+    if (-not (Test-Path -LiteralPath (Join-Path $expectedRoot '.git'))) { return $fallback }
+    $git=Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue
+    if (-not $git) { return $fallback }
+    # Windows PowerShell 5.1 can turn native stderr into a terminating error
+    # under ErrorActionPreference=Stop, including when stderr is redirected.
+    $top=@(& $git.Source -C $ProjectDirectory rev-parse --show-toplevel 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $top.Count -ne 1) { return $fallback }
+    $actualRoot=[IO.Path]::GetFullPath([string]$top[0]).TrimEnd('\')
+    if (-not $actualRoot.Equals($expectedRoot,[StringComparison]::OrdinalIgnoreCase)) { return $fallback }
+    $head=@(& $git.Source -C $ProjectDirectory rev-parse HEAD 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $head.Count -eq 1 -and $head[0] -match '^[0-9a-fA-F]{40}$') { return [string]$head[0] }
+  } catch {
+    # A source archive remains installable without Git metadata or Git itself.
+    return $fallback
+  }
+  return $fallback
+}
 $project = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $runtime = [IO.Path]::GetFullPath($RuntimeRoot)
 if ($runtime -eq [IO.Path]::GetPathRoot($runtime)) { throw 'RuntimeRoot cannot be a drive root.' }
@@ -61,8 +85,7 @@ try {
   $report.dependencies='passed'
   & $venvPython -m pip freeze | Set-Content -LiteralPath (Join-Path $runtime 'diagnostics\dependencies-installed.txt') -Encoding UTF8
   $report.python_version=(& $venvPython -c 'import sys; print(sys.version.split()[0])')
-  $git=Get-Command git.exe -ErrorAction SilentlyContinue
-  if ($git) { $report.git_revision=(& $git.Source -C $project rev-parse HEAD 2>$null) }
+  $report.git_revision=Get-SextaSourceRevision -ProjectDirectory $project
   & $venvPython -m sexta_feira init
   if ($LASTEXITCODE -ne 0) { throw 'SQLite or private credential initialization failed.' }
   $report.database='initialized'

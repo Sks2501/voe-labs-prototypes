@@ -97,6 +97,12 @@ dependendo de acesso administrativo executável e dos testes acima.
 
 ## Histórico de engenharia
 
+Correção posterior para entrega por ZIP: validada em Windows PowerShell 5.1.
+Pacotes sem `.git` registram `source-package` sem abortar a instalação; metadados
+de repositórios ancestrais são ignorados. A descoberta de Python foi confirmada
+quando somente 3.13 está disponível. O wrapper BAT conserva a janela aberta para
+leitura do resultado. Não houve nova instalação ou carga de modelo nesses testes.
+
 Ramificação autorizada: `sexta-feira-openai-gpt2`; alterações limitadas ao
 diretório `sexta-feira/`. A ramificação `main` não foi alterada.
 

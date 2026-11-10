@@ -4,6 +4,11 @@ O diagnóstico vale somente para a máquina em que o script é executado. Antes 
 
 ## Instalação
 
+Ao executar `instalar_windows.bat` por duplo clique, a janela aguarda uma tecla
+ao terminar para que o resultado permaneça visível, inclusive em caso de erro.
+Para automação sem interação, use `scripts/install.ps1` diretamente ou defina
+`SEXTA_NO_PAUSE=1` somente no processo que chama o BAT.
+
 Use Python 3.11 a 3.13 de 64 bits em um local acessível à conta de serviço; prefira uma instalação por máquina, já aprovada pelo proprietário. O script não instala nem atualiza o Python global. A seleção automática procura primeiro `py -3.11`, depois `-3.12`, `-3.13` e, por fim, o `python` existente no PATH, sempre validando versão e arquitetura. A versão preferida é 3.11; `-Python` permite selecionar explicitamente outro interpretador suportado. É necessário ao menos 5 GB livres no volume de runtime e 1,8 GB de RAM livre no momento da instalação; esses mínimos não substituem a medição junto aos serviços de produção.
 
 Em PowerShell, na pasta `sexta-feira`:
