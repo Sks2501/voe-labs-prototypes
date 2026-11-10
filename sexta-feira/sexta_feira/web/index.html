@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d19">
+  <meta name="description" content="Assistente SEXTA-FEIRA, gratuita e executada localmente com o GPT-2 da OpenAI.">
+  <title>SEXTA-FEIRA | Assistente local</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="mark" aria-hidden="true">S</div>
+    <div class="brand">
+      <h1>SEXTA-FEIRA</h1>
+      <p>Assistente pessoal · GPT-2 OpenAI · local</p>
+    </div>
+    <span class="status" id="status" aria-live="polite">Desconectada</span>
+  </header>
+  <main>
+    <section class="panel chat">
+      <h2>Conversa</h2>
+      <div class="auth">
+        <label for="token">Token de acesso mostrado no terminal</label>
+        <div class="auth-row">
+          <input id="token" type="password" autocomplete="off" spellcheck="false">
+          <button type="button" id="connect">Conectar</button>
+        </div>
+      </div>
+      <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Histórico da conversa"></div>
+      <form id="chat-form" class="compose">
+        <label for="prompt" class="sr">Mensagem para a SEXTA-FEIRA</label>
+        <textarea id="prompt" rows="2" maxlength="1600" placeholder="Digite sua mensagem..." required></textarea>
+        <button type="submit" id="send">Enviar</button>
+      </form>
+      <div class="control-line">
+        <label><input type="checkbox" id="speak"> Ler respostas em voz alta (voz do dispositivo)</label>
+        <button class="quiet" id="stop-speech" type="button">Silenciar</button>
+      </div>
+    </section>
+    <aside class="side">
+      <section class="panel">
+        <h2>Memórias</h2>
+        <p class="muted">Salve fatos importantes manualmente. Você pode apagá-los quando quiser.</p>
+        <form id="memory-form" class="stack">
+          <label for="memory" class="sr">Nova memória</label>
+          <input id="memory" maxlength="480" required placeholder="O que devo lembrar?">
+          <button type="submit">Salvar memória</button>
+        </form>
+        <ul id="memories" class="entries"></ul>
+      </section>
+      <section class="panel">
+        <h2>Tarefas</h2>
+        <form id="task-form" class="stack">
+          <label for="task" class="sr">Nova tarefa</label>
+          <input id="task" maxlength="480" required placeholder="O que precisa fazer?">
+          <button type="submit">Adicionar tarefa</button>
+        </form>
+        <ul id="tasks" class="entries"></ul>
+      </section>
+    </aside>
+  </main>
+  <footer>
+    Dados armazenados no computador. Os pesos são do GPT-2 da OpenAI;
+    esta personalização é independente, não é o ChatGPT oficial.
+    <span id="notice" role="status" aria-live="polite"></span>
+  </footer>
+</body>
+</html>
