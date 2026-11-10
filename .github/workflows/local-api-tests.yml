@@ -1,0 +1,25 @@
+name: GPT-2 local API tests
+on:
+  push:
+    branches:
+      - openai-gpt2
+  pull_request:
+    branches:
+      - openai-gpt2
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Check syntax
+        run: python -m compileall -q src tests
+      - name: Run local HTTP API tests
+        run: python -m unittest discover -s tests -v
