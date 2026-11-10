@@ -1,49 +1,65 @@
-# SEXTA-FEIRA — OpenAI GPT-2 local para Windows
+# SEXTA-FEIRA — OpenAI GPT-2 privado
 
-Assistente experimental pessoal, gratuita, sem API paga, sem Ollama e sem GPU obrigatória.
-O núcleo original do repositório [openai/gpt-2](https://github.com/openai/gpt-2) está preservado na pasta `openai-gpt2/`, com otimizações pontuais no cache do tokenizador e no exemplo de geração por CPU.
+Assistente pessoal experimental, modificável, com inferência local gratuita em CPU. O motor usa os pesos **OpenAI GPT-2 124M originais**, preservados no formato TensorFlow e lidos por um adaptador PyTorch próprio. Não utiliza API comercial, Ollama, Transformers, serviços pagos de inferência ou modelos de outras empresas.
 
-O aplicativo `sexta_feira/` executa **os mesmos pesos GPT-2** disponibilizados pela OpenAI, através de uma adaptação em PyTorch/Transformers. Isso evita a exigência do TensorFlow 1.12 original, que não é adequado para Python moderno no Windows. Esta adaptação **não executa diretamente o código TensorFlow de `openai-gpt2/src/model.py`**: os arquivos originais estão incluídos para modificações, estudo e preservação da procedência.
+**GPT-2 não é um chatbot moderno.** A geração em português pode ser incoerente, incorreta ou não seguir instruções. Os pesos não foram treinados nem melhorados. Memória, tarefas, autenticação e ferramentas são software determinístico externo ao modelo. Texto gerado não comprova uma ação realizada.
 
-**Limitação:** GPT-2 é um modelo de 2019 de previsão de texto, não um chatbot treinado para seguir instruções. Pode produzir respostas incorretas, incoerentes, em inglês ou não seguir o papel de assistente. Modificar código não o torna equivalente ao ChatGPT. O aplicativo não controla o sistema operacional, não acessa dados privados automaticamente e não tem comandos de shell.
+## O que está implementado
 
-## Requisitos
+- API REST privada `/api/v1`, Bearer obrigatório, sessões com expiração e revogação, papéis usuário/admin, OpenAPI autenticado, validação de origem/host e limites.
+- SQLite próprio com histórico, memórias explícitas editáveis/excluíveis, tarefas, preferências, exportação limitada, backup consistente e verificação de integridade.
+- Interface HTML/CSS/JS escura, responsiva, sem CDN, com estado real do modelo, fila e métricas administrativas. Token somente na memória da página.
+- Voz com sintetizadores locais em português do navegador, quando disponíveis. Microfone desativado; Whisper ainda não instalado nem validado.
+- Carga única sob demanda, uma inferência por vez, fila de duas, uma thread CPU, 512 tokens de entrada, até 64 novos, timeout e reserva preventiva de RAM.
+- Instalador Windows isolado, diagnóstico privado, logs rotativos, preparação de serviço LocalService via WinSW e procedimento de atualização/reversão.
 
-- Windows 10 ou 11, 64 bits, Python 3.11 64 bits, conexão apenas para instalação.
-- CPU Intel i5-4570 e 12 GB de RAM são suficientes para experimentar com `small` (124M). O desempenho real varia.
-- Aproximadamente 5 GB ou mais livres para Python, PyTorch, bibliotecas e modelo.
-- Git opcional se usar o ZIP do GitHub.
+**Estado da implantação:** testes locais incluem pesos reais e inferência CPU. Serviço Windows Server, WinSW e Cloudflare precisam de execução e validação no destino. A presença dos scripts não significa que foram instalados no servidor.
 
-## Instalação automática no Windows
+## Instalação Windows
 
-1. Instale [Python 3.11 x64](https://www.python.org/downloads/) com o Python Launcher.
-2. Abra a pasta `sexta-feira` que contém este README.
-3. Execute `instalar_windows.bat`. Ele cria o ambiente virtual, instala PyTorch CPU e Transformers e baixa os pesos oficiais convertidos do GPT-2 small.
-4. Execute `iniciar_windows.bat`. O programa exibe o endereço e um token único de acesso.
-5. Abra `http://127.0.0.1:8765` no navegador, cole o token e clique em Conectar.
-6. Converse, salve memórias e tarefas. Para desligar, use Ctrl+C na janela do servidor.
+Python x64 3.11–3.13, pelo menos 5 GB livres no volume escolhido e margem de RAM para os demais serviços. A instalação não substitui Python global nem serviços da Team Bike. Use diretórios exclusivos; consulte [operação Windows](docs/WINDOWS.md) antes de executar no servidor compartilhado.
 
-Os pesos são baixados uma única vez do identificador `openai-community/gpt2` (checkpoint GPT-2 original convertido ao formato Transformers). Após instalar, `iniciar_windows.bat` define `SEXTA_OFFLINE=1` para impedir tentativas de download do modelo.
+```powershell
+.\scripts\audit.ps1
+.\scripts\install.ps1 -Python 'C:\Python311\python.exe' -RuntimeRoot 'C:\SextaFeiraRuntime'
+.\scripts\start.ps1 -RuntimeRoot 'C:\SextaFeiraRuntime'
+```
 
-## Executar testes
+O caminho Python é exemplo: use um interpretador x64 realmente instalado e acessível à conta de serviço. Os scripts recusam uma porta ocupada e não encerram seu proprietário. Os wrappers `.bat` são atalhos para os mesmos scripts.
 
-Com a instalação concluída, execute `TESTES.bat` para testar armazenamento e rotas HTTP. O teste de inferência completa requer carregar o modelo e não é automatizado aqui.
+O instalador baixa PyTorch do índice CPU oficial, aplica versões de `requirements.txt` e `constraints.txt`, baixa os sete arquivos da origem oficial OpenAI e verifica seus hashes. Banco, modelos, token, logs e relatórios ficam no runtime privado, fora do Git. A execução normal nunca baixa modelos.
 
-## Acesso pelo celular
+Abra `http://127.0.0.1:8765`, obtenha o token em `data\access.token` por um editor local autorizado e inicie uma sessão. Use papel usuário no cotidiano; admin para métricas, backup e administração de sessões. Não coloque o token em comandos, capturas, GitHub ou documentos. O `init` aplica uma DACL privada no Windows.
 
-O servidor por padrão aceita exclusivamente conexões do próprio computador (`127.0.0.1`). O endereço do navegador **não funciona no celular** neste modo. Existe um modo de rede local por `python -m sexta_feira serve --host 0.0.0.0 --token ...`, porém o HTTP não criptografa tráfego, então não exponha na Internet. Para uso por celular, prefira rede privada com túnel autenticado e TLS, configurado pelo proprietário. Não há exposição pública automática.
+## Desenvolvimento e testes
 
-## Alterar tamanho do cérebro
+Com as variáveis `SEXTA_DATA_DIR` e `SEXTA_MODEL_DIR` apontando para diretórios privados do ambiente de teste:
 
-`small` (124M) é o padrão; `medium` (355M) e `large` (774M) podem ser selecionados usando o CLI `download --model medium` e depois `serve --model medium`, mas aumentam consumo e lentidão. O XL 1558M está no repositório original, mas não é selecionável no adaptador por causa das limitações deste PC.
+```powershell
+python -m sexta_feira init
+python -m sexta_feira download --model small
+python -m sexta_feira verify-model --model small
+python -m unittest discover -s tests -v
+$env:SEXTA_RUN_MODEL_TESTS='1'
+python -m unittest discover -s tests -v
+python scripts\smoke.py
+python -m sexta_feira serve --token-file 'CAMINHO_PRIVADO\access.token'
+```
 
-## Licença, direitos e identificação
+Sem `SEXTA_RUN_MODEL_TESTS=1`, os quatro testes do checkpoint real são ignorados explicitamente. O smoke utiliza banco temporário e não altera conversas existentes. Os resultados locais estão em [validação](docs/VALIDATION.md) e [benchmark](docs/benchmark-local.json). Os tempos do computador de desenvolvimento não são medições do Dell/Windows Server.
 
-- Código GPT-2 original e pesos: licença modificada MIT da OpenAI, em `openai-gpt2/LICENSE`. Preserve as atribuições e a indicação de texto gerado por IA.
-- O restante do código de adaptação da SEXTA-FEIRA pode ser editado e distribuído, respeitando a licença acima.
-- SEXTA-FEIRA é uma personalização **independente**. Não é produto oficial da OpenAI, nem uma cópia do ChatGPT/Claude. O projeto não contém código privado dessas empresas.
+## Rede, segurança e manutenção
 
-## Privacidade
+O servidor escuta somente em loopback. O uso móvel depende de HTTPS e acesso protegido; o roteiro para `sexta.teambike.online` está em [Cloudflare](docs/CLOUDFLARE.md). Não exponha a porta 8765 diretamente e não substitua rotas existentes. Nenhuma publicação de DNS ou Tunnel é automática.
 
-Mensagens, memórias e tarefas ficam em SQLite no diretório `%LOCALAPPDATA%\SextaFeira` (Windows) ou `~/.sexta-feira` em outros sistemas.
-O token é apresentado a cada inicialização, não é salvo automaticamente no navegador, e não há API remota de IA. Não exponha a porta 8765 na Internet.
+SQLite não é criptografado pelo aplicativo. A proteção em repouso depende de ACL, conta Windows e, se exigido pelo proprietário, criptografia de disco do sistema. Backups/exportações continuam sendo dados privados. O projeto é para um proprietário e seu espaço pessoal compartilhado com clientes autorizados; não oferece isolamento multiempresa.
+
+Histórico é persistido separadamente de memórias explicitamente salvas. Apenas poucas mensagens e memórias pertinentes entram no contexto. Memórias e tarefas têm limites conservadores, com erro explícito ao atingir o limite; histórico possui consulta paginada e exclusão. Backups não são enviados à nuvem.
+
+Atualizações exigem backup, revisão de versões e testes antes de parar somente a SEXTA-FEIRA. Dados/configuração são preservados e há roteiro de reversão em [Windows](docs/WINDOWS.md). Não existem atualizações automáticas de dependências.
+
+## Origem e licença
+
+Fonte histórica: [openai/gpt-2](https://github.com/openai/gpt-2). O código original, a licença MIT modificada e uma cópia pristine estão acessíveis em `openai-gpt2/`. [Detalhes de inferência](docs/INFERENCE.md) registram commit, hashes, alterações e seus testes. [Arquitetura](docs/ARCHITECTURE.md) descreve as fronteiras dos módulos e os limites operacionais.
+
+SEXTA-FEIRA é uma personalização independente; não é produto oficial da OpenAI nem equivalente ao ChatGPT. Preserve atribuições e identifique os textos gerados.
