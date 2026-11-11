@@ -94,6 +94,8 @@ class InferenceEngine:
         self._timeout = _integer_setting("SEXTA_INFERENCE_TIMEOUT", 60, 5, 180)
         self._threads = _integer_setting("SEXTA_CPU_THREADS", 1, 1, min(2, os.cpu_count() or 1))
         self._reserve_mb = _integer_setting("SEXTA_MEMORY_RESERVE_MB", 1024, 512, 8192)
+        self._input_limit = min(512, MAX_INPUT_TOKENS)
+        self._output_limit = min(64, MAX_NEW_TOKENS)
 
     def _memory_guard(self, *, loading=False, model_size="small"):
         allocation = (900 if model_size == "small" else 2100) if loading else 96
@@ -174,8 +176,8 @@ class InferenceEngine:
                 check()
                 _, model = self.load(job.model_size)
                 check()
-                result, count = model.generate(job.prompt, input_limit=min(512, MAX_INPUT_TOKENS),
-                                               new_tokens=min(64, MAX_NEW_TOKENS), cancelled=check)
+                result, count = model.generate(job.prompt, input_limit=self._input_limit,
+                                               new_tokens=self._output_limit, cancelled=check)
                 check()
                 for delimiter in ("\nUsuário:", "\nSEXTA-FEIRA:", "\nUser:", "\nAssistant:"):
                     result = result.split(delimiter, 1)[0].strip()
@@ -200,7 +202,7 @@ class InferenceEngine:
     def status(self):
         return {"model": self._model_size or DEFAULT_MODEL, "loaded": self._model is not None,
                 "loading": self._loading, "device": "cpu", "cpu_threads": self._threads,
-                "context_tokens": min(512, MAX_INPUT_TOKENS), "max_new_tokens": min(64, MAX_NEW_TOKENS),
+                "context_tokens": self._input_limit, "max_new_tokens": self._output_limit,
                 "queue_depth": self._queue.qsize(), "queue_limit": self._queue.maxsize,
                 "processing": self._active is not None, "requests": self._requests,
                 "generated_tokens": self._generated, "last_seconds": self._last_seconds,
@@ -236,7 +238,14 @@ def _get_engine():
     global _ENGINE
     with _ENGINE_LOCK:
         if _ENGINE is None:
-            _ENGINE = InferenceEngine()
+            backend = os.environ.get("SEXTA_BACKEND", "gpt2")
+            if backend == "llama.cpp":
+                from .inference_llama import LocalChatEngine
+                _ENGINE = LocalChatEngine()
+            elif backend == "gpt2":
+                _ENGINE = InferenceEngine()
+            else:
+                raise ValueError("Unknown inference backend")
         return _ENGINE
 
 
@@ -246,7 +255,14 @@ def load_model(model_size: str = DEFAULT_MODEL):
 
 def generate_reply(message: str, history: list[dict], memories: list[dict], model_size: str = DEFAULT_MODEL,
                    *, cancel_event=None, timeout=None) -> str:
-    return _get_engine().submit(build_prompt(message, history, memories), model_size, cancel_event, timeout)
+    engine = _get_engine()
+    if getattr(engine, "backend", None) == "llama.cpp":
+        return engine.submit(engine.build_messages(message, history, memories), model_size, cancel_event, timeout)
+    return engine.submit(build_prompt(message, history, memories), model_size, cancel_event, timeout)
+
+
+def generated_source():
+    return "local_model" if os.environ.get("SEXTA_BACKEND", "gpt2") == "llama.cpp" else "gpt2"
 
 
 def engine_status():

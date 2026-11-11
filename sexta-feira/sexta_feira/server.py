@@ -20,7 +20,7 @@ from .settings import (DATA_DIR, DEFAULT_MODEL, MAX_HTTP_CONNECTIONS,
 from .security import Authentication, RateLimiter
 from .storage import Storage, CapacityError, ExportTooLarge, cleaned, identifier
 from .tools import execute_tool, execute_chat_command
-from .observability import configure_logging, resource_snapshot
+from .observability import configure_logging, resource_snapshot, native_resource_snapshot
 
 WEB_DIR = Path(__file__).parent / "web"
 LOGGER = logging.getLogger("sexta_feira.http")
@@ -120,6 +120,15 @@ class AssistantServer(ThreadingHTTPServer):
         result["uptime_seconds"] = round(time.monotonic() - self.started_at, 3)
         result["model"] = model_status()
         result.update(resource_snapshot(self.storage.path.parent))
+        if result["model"].get("backend") == "llama.cpp":
+            native = native_resource_snapshot(self.storage.path.parent)
+            if native:
+                result["api_process_rss_bytes"] = result.get("process_rss_bytes", 0)
+                result["process_rss_bytes"] = result["api_process_rss_bytes"] + native["inference_process_rss_bytes"]
+                result["process_cpu_seconds"] += native.get("inference_process_cpu_seconds", 0)
+                own_cpu, model_cpu = result.get("process_cpu_percent"), native.get("inference_process_cpu_percent")
+                result["process_cpu_percent"] = round(own_cpu + model_cpu, 2) if own_cpu is not None and model_cpu is not None else None
+                result.update(native)
         return result
 
 
@@ -348,13 +357,18 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._fields(data, {"role"})
             self._json(201, self.server.auth.create_session(principal, data.get("role", "user")))
         elif path in ("/api/v1/conversations", "/api/v1/chat") and self.command == "POST":
-            self._fields(data, {"message"}, {"message"})
+            self._fields(data, {"message", "context_after"}, {"message"})
             message = cleaned(data["message"], 1600)
+            context_after = identifier(data["context_after"]) if "context_after" in data else None
             result = execute_chat_command(message, db)
             if result is None:
-                reply = brain.generate_reply(message, db.history(8), db.memories(), self.server.model_size)
-                result = {"reply": reply, "source": "gpt2", "generated": True, "action_executed": False}
-            db.save_exchange(message, result["reply"])
+                history = db.history(8)
+                if context_after is not None:
+                    history = [item for item in history if item["id"] > context_after]
+                reply = brain.generate_reply(message, history, db.memories(), self.server.model_size)
+                result = {"reply": reply, "source": brain.generated_source(), "generated": True,
+                          "action_executed": False, "model": model_status().get("model")}
+            db.save_exchange(message, result["reply"], source=result.get("source"), model=result.get("model"))
             self._json(200, result)
         elif path == "/api/v1/memories" and self.command == "POST":
             self._fields(data, {"content"}, {"content"})
@@ -436,7 +450,8 @@ def openapi_document() -> dict:
     """Self-contained OpenAPI; clients need no external CDN or remote documentation."""
     schemas = {
         "Message": {"type": "object", "required": ["message"], "additionalProperties": False,
-                    "properties": {"message": {"type": "string", "minLength": 1, "maxLength": 1600}}},
+                    "properties": {"message": {"type": "string", "minLength": 1, "maxLength": 1600},
+                                   "context_after": {"type": "integer", "minimum": 1}}},
         "Content": {"type": "object", "required": ["content"], "additionalProperties": False,
                     "properties": {"content": {"type": "string", "minLength": 1, "maxLength": 480}}},
         "TaskUpdate": {"type": "object", "minProperties": 1, "additionalProperties": False,

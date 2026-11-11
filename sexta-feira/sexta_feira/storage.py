@@ -124,7 +124,32 @@ class Storage:
                 "SELECT id,role,content,created_at FROM messages " +
                 ("WHERE id<? " if before is not None else "") + "ORDER BY id DESC LIMIT ?",
                 (identifier(before), limit) if before is not None else (limit,)).fetchall()
-        return [dict(row) for row in reversed(rows)]
+            result = [dict(row) for row in reversed(rows)]
+            self._attach_message_metadata(db, result)
+        return result
+
+    @staticmethod
+    def _attach_message_metadata(db, messages):
+        for offset in range(0, len(messages), 500):
+            batch = messages[offset:offset + 500]
+            keys = ["message-source:" + str(item["id"]) for item in batch]
+            if not keys:
+                continue
+            rows = db.execute("SELECT key,value FROM metadata WHERE key IN (" + ",".join("?" for _ in keys) + ")", keys)
+            metadata = {}
+            for row in rows:
+                try:
+                    value = json.loads(row["value"])
+                    if value.get("source") in ("gpt2", "local_model", "tool"):
+                        metadata[row["key"]] = value
+                except (ValueError, TypeError, AttributeError):
+                    pass
+            for item in batch:
+                value = metadata.get("message-source:" + str(item["id"]))
+                if value and item["role"] == "assistant":
+                    item["source"] = value["source"]
+                    if isinstance(value.get("model"), str):
+                        item["model"] = value["model"][:120]
 
     def add_memory(self, text: str) -> int:
         text = cleaned(text, 480)
@@ -182,15 +207,25 @@ class Storage:
                 "UPDATE tasks SET completed=1-completed WHERE id=?", (identifier(item_id),))
             return cur.rowcount > 0
 
-    def save_exchange(self, message: str, reply: str) -> None:
+    def save_exchange(self, message: str, reply: str, *, source=None, model=None) -> None:
         now = datetime.now(timezone.utc).isoformat()
         rows = [("user", cleaned(message, 1600), now), ("assistant", cleaned(reply, 6000), now)]
+        if source is not None and source not in ("gpt2", "local_model", "tool"):
+            raise ValueError("Fonte de resposta inválida.")
+        if model is not None:
+            model = cleaned(model, 120)
         with self._connect() as db:
-            db.executemany("INSERT INTO messages(role,content,created_at) VALUES (?,?,?)", rows)
+            db.execute("INSERT INTO messages(role,content,created_at) VALUES (?,?,?)", rows[0])
+            cursor = db.execute("INSERT INTO messages(role,content,created_at) VALUES (?,?,?)", rows[1])
+            if source is not None:
+                db.execute("INSERT INTO metadata(key,value) VALUES (?,?)",
+                           ("message-source:" + str(cursor.lastrowid), json.dumps({"source": source, "model": model})))
 
     def delete_history(self) -> int:
         with self._connect() as db:
-            return db.execute("DELETE FROM messages").rowcount
+            count = db.execute("DELETE FROM messages").rowcount
+            db.execute("DELETE FROM metadata WHERE key LIKE 'message-source:%'")
+            return count
 
     def update_memory(self, item_id: int, content: str) -> bool:
         with self._connect() as db:
@@ -275,6 +310,8 @@ class Storage:
             # plus generous object/key/integer overhead for each row.
             db.execute("BEGIN")
             estimated = 512
+            meta_size = db.execute("SELECT coalesce(sum(length(CAST(value AS BLOB))),0) FROM metadata WHERE key LIKE 'message-source:%'").fetchone()[0]
+            estimated += meta_size * 6
             for name in ("messages", "memories", "tasks"):
                 text_columns = ("content", "created_at", "role") if name == "messages" else ("content", "created_at")
                 lengths = "+".join("length(CAST(" + column + " AS BLOB))" for column in text_columns)
@@ -290,6 +327,8 @@ class Storage:
                 columns = {"messages": "id,role,content,created_at", "memories": "id,content,created_at",
                            "tasks": "id,content,completed,created_at"}[name]
                 result[name] = [dict(row) for row in db.execute("SELECT " + columns + " FROM " + name + " ORDER BY id")]
+                if name == "messages":
+                    self._attach_message_metadata(db, result[name])
             preferences = {"voice_enabled": False, "voice_rate": 1.0, "language": "pt-BR"}
             for row in db.execute("SELECT key,value FROM preferences"):
                 preferences[row["key"]] = json.loads(row["value"])
