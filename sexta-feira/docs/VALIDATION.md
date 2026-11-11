@@ -2,6 +2,16 @@
 
 ## Atualização de implantação — 11/11/2026
 
+### CPU, RAM e disco disponíveis para o proprietário
+
+O endpoint autenticado `/hardware` e a ferramenta `server_hardware` foram implantados. Sessão user agora pode consultar uso total de CPU, RAM total/usada/disponível, RAM da IA/API e disco; `/metrics` continua exclusivo de admin. A saída permitida exclui PIDs, caminhos, portas, contadores administrativos e credenciais. O painel atualiza a cada 10 s enquanto visível. Solicitações operacionais diretas usam a ferramenta, sem gerar números pelo modelo.
+
+No servidor, 80 testes descobertos: 75 passaram e cinco testes históricos de checkpoint opt-in foram ignorados. Passaram cálculo de CPU (kernel inclui idle), primeira amostra, métricas filtradas, ferramentas sem argumentos, autenticação user, proteção admin e regressões. JavaScript passou sintaxe e oito verificações de renderização segura. Não foi realizado teste de carga nem nova inferência nesta alteração.
+
+No HTTPS real, verificados login user, painel, atualização automática entre duas amostras, capacidades e uso de RAM/disco, leitura de CPU, requisição natural pelo chat, origem recusada, falta de autenticação recusada, `/metrics` recusado para user e logout. Viewports 390 × 700 e 360 × 640 sem transbordamento horizontal. Não houve teste físico em Android. Serviços/portas de produção e processo de inferência permaneceram com as mesmas identidades durante o deploy; apenas serviços próprios de API/túnel foram reiniciados. Backup consistente privado preservado.
+
+O provedor CPU opcional foi preparado no servidor: ZIP LibreHardwareMonitor 0.9.6 e instalador PawnIO 2.2.0 com SHA-256 conferidos, Authenticode válido do instalador e biblioteca .NET 0.9.6.0 carregada sem abrir hardware. A configuração ficou desativada, sem driver instalado. **Temperatura interna de CPU ainda não validada: ativação depende da autorização específica solicitada ao proprietário.** Não se declara temperatura de RAM/GPU ou acesso irrestrito ao hardware. Veja [TEMPERATURES.md](TEMPERATURES.md).
+
 ### Sensores de temperatura do servidor
 
 Ferramenta `/temperaturas`, endpoint Bearer `/api/v1/temperatures`, botão no chat e painel de sensores implantados. O coletor isolado usa provedores nativos Windows, a cada minuto, sem driver adicional; a API continua LocalService. Foram confirmadas leituras de disco e zona ACPI, sem atribuir a zona à CPU nem classificar o equipamento como normal. CPU, GPU, RAM, placa-mãe e bateria continuam indisponíveis nesta integração.
