@@ -3,7 +3,7 @@ const $ = id => document.getElementById(id);
 const API = "/api/v1";
 let accessToken = "", role = "user", busy = false;
 let contextAfter = 0, lastMessageId = 0, contextInitialized = false, showAllHistory = false;
-let selectedThread=null, threadItems=[], visibleMessages=[], profileState={}, profileDirty=false, noticeTimer;
+let selectedThread=null, threadItems=[], visibleMessages=[], profileState={}, profileDirty=false, noticeTimer, navigationSequence=0;
 const profileFields={preferred_name:"preferred-name",about_me:"about-me",goals:"goals",response_style:"response-style"};
 const collections={memories:[],tasks:[]}, counts={memories:0,tasks:0}, limits={memories:100,tasks:200};
 const responseSources=new Map();
@@ -137,7 +137,7 @@ async function refresh(latestResponse) {
   for(const name of ["memories","tasks"]) { counts[name]=state.counts?.[name] ?? (state[name] || []).length;limits[name]=state.limits?.[name] ?? limits[name]; }
   fillProfile(state.preferences || {});renderThreads(state.threads || []);
   if(!busy || latestResponse) {
-    if(selectedThread){const thread=await request("/threads/"+selectedThread);visibleMessages=thread.history;history(visibleMessages);$("thread-more").hidden=visibleMessages.length<100;}
+    if(selectedThread){const target=selectedThread;const thread=await request("/threads/"+target);if(selectedThread===target && !showAllHistory){visibleMessages=thread.history;history(visibleMessages);$("thread-more").hidden=visibleMessages.length<100;}}
     else if(!showAllHistory){visibleMessages=[];history([]);$("thread-more").hidden=true;}
   }
   entries("memories",state.memories || []);entries("tasks",state.tasks || []);modelStatus(state.model || {});
@@ -161,7 +161,7 @@ $("auth-form").addEventListener("submit", async event => {
   try { const session = await request("/sessions", {role: $("role").value}); accessToken = session.token; role = session.role;contextInitialized=false;showAllHistory=false;connected(true);await refresh();await refreshStatus().catch(() => {});notice("Sessão privada iniciada. O modelo roda no seu servidor.");if(!window.matchMedia("(max-width:700px)").matches)$("prompt").focus(); }
   catch (error) { accessToken = ""; connected(false); notice(error.message); } finally { $("connect").disabled = false; }
 });
-$("logout").addEventListener("click", async () => { try { await request("/sessions/current", undefined, "DELETE"); } catch {} accessToken="";selectedThread=null;visibleMessages=[];profileDirty=false;fillProfile({});renderThreads([]);responseSources.clear();collections.memories=[];collections.tasks=[];counts.memories=0;counts.tasks=0;connected(false);$("messages").replaceChildren();$("memories").replaceChildren();$("tasks").replaceChildren();$("model-brand").textContent="Sua assistente privada";$("model-status").replaceChildren();activateView("chat");if("speechSynthesis" in window) speechSynthesis.cancel();notice("Sessão encerrada."); });
+$("logout").addEventListener("click", async () => { try { await request("/sessions/current", undefined, "DELETE"); } catch {} accessToken="";navigationSequence++;selectedThread=null;visibleMessages=[];profileDirty=false;fillProfile({});renderThreads([]);responseSources.clear();collections.memories=[];collections.tasks=[];counts.memories=0;counts.tasks=0;connected(false);$("messages").replaceChildren();$("memories").replaceChildren();$("tasks").replaceChildren();$("model-brand").textContent="Sua assistente privada";$("model-status").replaceChildren();activateView("chat");if("speechSynthesis" in window) speechSynthesis.cancel();notice("Sessão encerrada."); });
 $("chat-form").addEventListener("submit", async event => {
   event.preventDefault(); if (busy || !accessToken) return; const text = $("prompt").value.trim(); if (!text) return;
   const currentToken=accessToken; busy = true; $("send").disabled = true;$("new-chat").disabled=true; $("processing").hidden = false; $("prompt").value = ""; message("user", text); notice("Gerando resposta no servidor…");
@@ -181,7 +181,7 @@ $("refresh-status").addEventListener("click", async () => { try { await refreshS
 $("history").addEventListener("click", async () => { if(busy)return;try { const data=await request("/history?limit=100");selectedThread=null;showAllHistory=true;visibleMessages=data.history || [];renderThreads(threadItems);history(visibleMessages);$("thread-more").hidden=true;activateView("chat");notice("Histórico geral preservado (até 100 mensagens). Enviar uma mensagem inicia uma conversa separada."); } catch(error) { notice(error.message); } });
 $("export").addEventListener("click", async () => { try { const data = await request("/export"); const url = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"})); const a=document.createElement("a"); a.href=url; a.download="sexta-feira-dados-"+new Date().toISOString().slice(0,10)+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); notice("Exportação solicitada ao navegador. O arquivo contém dados privados."); } catch(error) { notice(error.message); } });
 $("prompt").addEventListener("keydown", event => { if(event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("chat-form").requestSubmit(); } });
-$("new-chat").addEventListener("click",()=>{if(busy || !accessToken)return;selectedThread=null;showAllHistory=false;visibleMessages=[];renderThreads(threadItems);history([]);$("thread-more").hidden=true;$("prompt").value="";resizePrompt();activateView("chat");if(!window.matchMedia("(max-width:700px)").matches)$("prompt").focus();});
+$("new-chat").addEventListener("click",()=>{if(busy || !accessToken)return;navigationSequence++;selectedThread=null;showAllHistory=false;visibleMessages=[];renderThreads(threadItems);history([]);$("thread-more").hidden=true;$("prompt").value="";resizePrompt();activateView("chat");if(!window.matchMedia("(max-width:700px)").matches)$("prompt").focus();});
 document.querySelectorAll(".navigation [data-view]").forEach(button=>button.addEventListener("click",()=>activateView(button.dataset.view)));
 $("workspace").addEventListener("click",event=>{const button=event.target.closest("[data-prompt]");if(!button || !accessToken || busy) return;$("prompt").value=button.dataset.prompt;$("chat-form").requestSubmit();});
 window.addEventListener("pagehide", () => { accessToken=""; if("speechSynthesis" in window) speechSynthesis.cancel(); });
@@ -204,7 +204,8 @@ function renderThreads(items) {
 }
 async function openThread(id) {
   if(busy || !accessToken)return;
-  try{const data=await request("/threads/"+id);selectedThread=id;showAllHistory=false;visibleMessages=data.history;history(visibleMessages);renderThreads(threadItems);$("thread-more").hidden=visibleMessages.length<100;activateView("chat");}catch(error){notice(error.message);}
+  const ticket=++navigationSequence;
+  try{const data=await request("/threads/"+id);if(ticket!==navigationSequence || !accessToken)return;selectedThread=id;showAllHistory=false;visibleMessages=data.history;history(visibleMessages);renderThreads(threadItems);$("thread-more").hidden=visibleMessages.length<100;activateView("chat");}catch(error){notice(error.message);}
 }
 $("thread-more").addEventListener("click",async()=>{if(!selectedThread || busy || !visibleMessages.length)return;const button=$("thread-more");button.disabled=true;try{const data=await request("/threads/"+selectedThread+"?limit=100&before="+visibleMessages[0].id);visibleMessages=[...data.history,...visibleMessages].slice(0,500);history(visibleMessages);$("messages").scrollTop=0;button.hidden=data.history.length<100 || visibleMessages.length>=500;if(visibleMessages.length>=500)notice("Exibindo até 500 mensagens. A exportação inclui o histórico completo, dentro do limite de tamanho.");}catch(error){notice(error.message);}finally{button.disabled=false;}});
 $("rename-chat").addEventListener("click",()=>{if(!selectedThread || busy)return;$("thread-name").value=threadItems.find(item=>item.id===selectedThread)?.title || "";$("rename-dialog").showModal();});

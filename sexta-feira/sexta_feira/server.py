@@ -474,6 +474,8 @@ def openapi_document() -> dict:
                                    "thread_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"}}},
         "Thread": {"type": "object", "additionalProperties": False,
                    "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 80}}},
+        "ThreadUpdate": {"type": "object", "additionalProperties": False, "required": ["title"],
+                         "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 80}}},
         "Content": {"type": "object", "required": ["content"], "additionalProperties": False,
                     "properties": {"content": {"type": "string", "minLength": 1, "maxLength": 480}}},
         "TaskUpdate": {"type": "object", "minProperties": 1, "additionalProperties": False,
@@ -500,7 +502,7 @@ def openapi_document() -> dict:
         "/health": {"get": None}, "/state": {"get": None}, "/model": {"get": None},
         "/conversations": {"post": "Message"}, "/history": {"get": None, "delete": None},
         "/threads": {"get": None, "post": "Thread"},
-        "/threads/{id}": {"get": None, "patch": "Thread", "delete": None},
+        "/threads/{id}": {"get": None, "patch": "ThreadUpdate", "delete": None},
         "/memories": {"get": None, "post": "Content"},
         "/memories/{id}": {"patch": "Content", "delete": None},
         "/tasks": {"get": None, "post": "Content"},
@@ -525,10 +527,10 @@ def openapi_document() -> dict:
                 operation["parameters"] = [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer", "minimum": 1}}]
                 if route == "/threads/{id}":
                     operation["parameters"][0]["schema"] = {"type": "string", "pattern": "^[a-f0-9]{32}$"}
-            if route in ("/history", "/memories", "/tasks") and method == "get":
-                operation["parameters"] = [
+            if route in ("/history", "/memories", "/tasks", "/threads/{id}") and method == "get":
+                operation.setdefault("parameters", []).extend([
                     {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200 if route == "/tasks" else 100}},
-                    {"name": "before", "in": "query", "schema": {"type": "integer", "minimum": 1}}]
+                    {"name": "before", "in": "query", "schema": {"type": "integer", "minimum": 1}}])
             if route.startswith("/admin/") or route == "/metrics" or (route == "/sessions" and method == "get") or route == "/sessions/{id}":
                 operation["description"] = "Requer papel admin."
             entry[method] = operation
