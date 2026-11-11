@@ -254,10 +254,10 @@ def load_model(model_size: str = DEFAULT_MODEL):
 
 
 def generate_reply(message: str, history: list[dict], memories: list[dict], model_size: str = DEFAULT_MODEL,
-                   *, cancel_event=None, timeout=None) -> str:
+                   *, cancel_event=None, timeout=None, preferences=None) -> str:
     engine = _get_engine()
     if getattr(engine, "backend", None) == "llama.cpp":
-        return engine.submit(engine.build_messages(message, history, memories), model_size, cancel_event, timeout)
+        return engine.submit(engine.build_messages(message, history, memories, preferences), model_size, cancel_event, timeout)
     return engine.submit(build_prompt(message, history, memories), model_size, cancel_event, timeout)
 
 

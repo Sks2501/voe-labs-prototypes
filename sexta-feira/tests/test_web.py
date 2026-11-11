@@ -44,6 +44,28 @@ class ServerTests(unittest.TestCase):
         conn.close()
         return status, payload
 
+    def test_thread_api_authentication_context_and_profile(self):
+        token = "token-de-acesso-para-teste"
+        self.assertEqual(self.call("GET", "/api/v1/threads")[0], 401)
+        status, a = self.call("POST", "/api/v1/threads", {"title":"A"}, token)
+        self.assertEqual(status, 201)
+        _, b = self.call("POST", "/api/v1/threads", {"title":"B"}, token)
+        self.server.storage.save_exchange("other conversation secret", "B", thread_id=b["id"])
+        self.call("PATCH", "/api/v1/preferences", {"preferred_name":"Criador", "about_me":"Criei esta IA."}, token)
+        with patch.object(brain, "generate_reply", return_value="Olá, Criador.") as model:
+            status, result = self.call("POST", "/api/v1/conversations", {"message":"Oi", "thread_id":a["id"]}, token)
+            self.assertEqual(status, 200)
+            self.assertEqual(model.call_args.args[1], [])
+            self.assertEqual(model.call_args.kwargs["preferences"]["preferred_name"], "Criador")
+            self.assertEqual(result["thread_id"], a["id"])
+        status, result = self.call("GET", "/api/v1/threads/"+a["id"]+"?limit=1", token=token)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(result["history"]), 1)
+        self.assertEqual(self.call("PATCH", "/api/v1/threads/"+a["id"], {"title":"Renamed"}, token)[0], 200)
+        self.assertEqual(self.call("DELETE", "/api/v1/threads/"+a["id"], token=token)[0], 200)
+        self.assertEqual(len(self.server.storage.thread_history(b["id"])), 2)
+        self.assertEqual(self.call("POST", "/api/v1/conversations", {"message":"x", "thread_id":"not-an-id"}, token)[0], 400)
+
     def test_health_requires_authentication(self):
         status, body = self.call("GET", "/api/health")
         self.assertEqual(status, 401)

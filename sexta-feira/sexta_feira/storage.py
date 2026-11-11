@@ -2,6 +2,8 @@
 from __future__ import annotations
 import sqlite3
 import json
+import re
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +13,13 @@ MEMORY_LIMIT = 100
 TASK_LIMIT = 200
 EXPORT_MAX_BYTES = 5 * 1024 * 1024
 EXPORT_MAX_ROWS = 10000
+PROFILE_FIELDS = {"preferred_name": 80, "about_me": 480, "goals": 400, "response_style": 160}
+
+
+def thread_identifier(value):
+    if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{32}", value):
+        raise ValueError("Conversa inválida.")
+    return value
 
 class CapacityError(RuntimeError):
     """Explicit capacity protects RAM and keeps records visible in the default UI."""
@@ -130,21 +139,27 @@ class Storage:
 
     @staticmethod
     def _attach_message_metadata(db, messages):
-        for offset in range(0, len(messages), 500):
-            batch = messages[offset:offset + 500]
-            keys = ["message-source:" + str(item["id"]) for item in batch]
+        for offset in range(0, len(messages), 250):
+            batch = messages[offset:offset + 250]
+            keys = [prefix + str(item["id"]) for item in batch for prefix in ("message-source:", "message-thread:")]
             if not keys:
                 continue
             rows = db.execute("SELECT key,value FROM metadata WHERE key IN (" + ",".join("?" for _ in keys) + ")", keys)
             metadata = {}
             for row in rows:
                 try:
+                    if row["key"].startswith("message-thread:"):
+                        metadata[row["key"]] = thread_identifier(row["value"])
+                        continue
                     value = json.loads(row["value"])
                     if value.get("source") in ("gpt2", "local_model", "tool"):
                         metadata[row["key"]] = value
                 except (ValueError, TypeError, AttributeError):
                     pass
             for item in batch:
+                thread_id = metadata.get("message-thread:" + str(item["id"]))
+                if thread_id:
+                    item["thread_id"] = thread_id
                 value = metadata.get("message-source:" + str(item["id"]))
                 if value and item["role"] == "assistant":
                     item["source"] = value["source"]
@@ -207,7 +222,63 @@ class Storage:
                 "UPDATE tasks SET completed=1-completed WHERE id=?", (identifier(item_id),))
             return cur.rowcount > 0
 
-    def save_exchange(self, message: str, reply: str, *, source=None, model=None) -> None:
+    def create_thread(self, title="Nova conversa"):
+        title = cleaned(title, 80)
+        now = datetime.now(timezone.utc).isoformat()
+        item = {"id": uuid.uuid4().hex, "title": title, "created_at": now, "updated_at": now}
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT count(*) FROM metadata WHERE key GLOB 'conversation:*'").fetchone()[0] >= 100:
+                raise CapacityError("Limite de 100 conversas. Exporte e exclua uma conversa para continuar.")
+            db.execute("INSERT INTO metadata(key,value) VALUES (?,?)", ("conversation:" + item["id"], json.dumps(item)))
+        return item
+
+    def threads(self):
+        with self._connect() as db:
+            items = [json.loads(row[0]) for row in db.execute("SELECT value FROM metadata WHERE key GLOB 'conversation:*' LIMIT 100")]
+        return sorted(items, key=lambda item: item["updated_at"], reverse=True)
+
+    def thread(self, item_id):
+        with self._connect() as db:
+            row = db.execute("SELECT value FROM metadata WHERE key=?", ("conversation:" + thread_identifier(item_id),)).fetchone()
+        if not row:
+            raise ValueError("Conversa não encontrada.")
+        return json.loads(row[0])
+
+    def thread_history(self, item_id, limit=100, before=None):
+        item_id = thread_identifier(item_id)
+        self.thread(item_id)
+        limit = max(1, min(100, int(limit)))
+        with self._connect() as db:
+            rows = db.execute("SELECT m.id,m.role,m.content,m.created_at FROM metadata t JOIN messages m "
+                "ON t.key='message-thread:'||m.id WHERE t.value=? " + ("AND m.id<? " if before is not None else "") +
+                "ORDER BY m.id DESC LIMIT ?", (item_id, identifier(before), limit) if before is not None else (item_id, limit)).fetchall()
+            result = [dict(row) for row in reversed(rows)]
+            self._attach_message_metadata(db, result)
+        return result
+
+    def rename_thread(self, item_id, title):
+        item_id, title = thread_identifier(item_id), cleaned(title, 80)
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT value FROM metadata WHERE key=?", ("conversation:" + item_id,)).fetchone()
+            if not row:
+                raise ValueError("Conversa não encontrada.")
+            item = json.loads(row[0]); item["title"] = title
+            db.execute("UPDATE metadata SET value=? WHERE key=?", (json.dumps(item), "conversation:" + item_id))
+        return item
+
+    def delete_thread(self, item_id):
+        item_id = thread_identifier(item_id)
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            rows = db.execute("SELECT m.id FROM messages m JOIN metadata t ON t.key='message-thread:'||m.id WHERE t.value=?", (item_id,)).fetchall()
+            for row in rows:
+                db.execute("DELETE FROM messages WHERE id=?", (row[0],))
+                db.execute("DELETE FROM metadata WHERE key IN (?,?)", ("message-source:" + str(row[0]), "message-thread:" + str(row[0])))
+            return db.execute("DELETE FROM metadata WHERE key=?", ("conversation:" + item_id,)).rowcount > 0
+
+    def save_exchange(self, message: str, reply: str, *, source=None, model=None, thread_id=None) -> None:
         now = datetime.now(timezone.utc).isoformat()
         rows = [("user", cleaned(message, 1600), now), ("assistant", cleaned(reply, 6000), now)]
         if source is not None and source not in ("gpt2", "local_model", "tool"):
@@ -215,16 +286,29 @@ class Storage:
         if model is not None:
             model = cleaned(model, 120)
         with self._connect() as db:
-            db.execute("INSERT INTO messages(role,content,created_at) VALUES (?,?,?)", rows[0])
+            db.execute("BEGIN IMMEDIATE")
+            conversation = None
+            if thread_id is not None:
+                thread_id = thread_identifier(thread_id)
+                row = db.execute("SELECT value FROM metadata WHERE key=?", ("conversation:" + thread_id,)).fetchone()
+                if not row:
+                    raise ValueError("Conversa não encontrada.")
+                conversation = json.loads(row[0])
+            user = db.execute("INSERT INTO messages(role,content,created_at) VALUES (?,?,?)", rows[0])
             cursor = db.execute("INSERT INTO messages(role,content,created_at) VALUES (?,?,?)", rows[1])
             if source is not None:
                 db.execute("INSERT INTO metadata(key,value) VALUES (?,?)",
                            ("message-source:" + str(cursor.lastrowid), json.dumps({"source": source, "model": model})))
+            if conversation:
+                db.executemany("INSERT INTO metadata(key,value) VALUES (?,?)", [("message-thread:" + str(i), thread_id) for i in (user.lastrowid, cursor.lastrowid)])
+                conversation["updated_at"] = now
+                db.execute("UPDATE metadata SET value=? WHERE key=?", (json.dumps(conversation), "conversation:" + thread_id))
 
     def delete_history(self) -> int:
         with self._connect() as db:
             count = db.execute("DELETE FROM messages").rowcount
             db.execute("DELETE FROM metadata WHERE key LIKE 'message-source:%'")
+            db.execute("DELETE FROM metadata WHERE key GLOB 'message-thread:*' OR key GLOB 'conversation:*'")
             return count
 
     def update_memory(self, item_id: int, content: str) -> bool:
@@ -253,14 +337,14 @@ class Storage:
             return db.execute("DELETE FROM tasks WHERE id=?", (identifier(item_id),)).rowcount > 0
 
     def preferences(self) -> dict:
-        defaults = {"voice_enabled": False, "voice_rate": 1.0, "language": "pt-BR"}
+        defaults = {"voice_enabled": False, "voice_rate": 1.0, "language": "pt-BR", **{key: "" for key in PROFILE_FIELDS}}
         with self._connect() as db:
             for row in db.execute("SELECT key,value FROM preferences"):
                 defaults[row["key"]] = json.loads(row["value"])
         return defaults
 
     def set_preferences(self, values: dict) -> dict:
-        if not isinstance(values, dict) or not values or set(values) - {"voice_enabled", "voice_rate", "language"}:
+        if not isinstance(values, dict) or not values or set(values) - ({"voice_enabled", "voice_rate", "language"} | PROFILE_FIELDS.keys()):
             raise ValueError("Preferências desconhecidas ou vazias.")
         if "voice_enabled" in values and not isinstance(values["voice_enabled"], bool):
             raise ValueError("voice_enabled deve ser booleano.")
@@ -269,6 +353,13 @@ class Storage:
             raise ValueError("voice_rate deve estar entre 0.5 e 2.0.")
         if values.get("language", "pt-BR") != "pt-BR":
             raise ValueError("Idioma suportado: pt-BR.")
+        values = dict(values)
+        for key, limit in PROFILE_FIELDS.items():
+            if key in values:
+                value = values[key]
+                if not isinstance(value, str) or len(value) > limit or "\x00" in value:
+                    raise ValueError(f"{key} precisa ser texto com até {limit} caracteres.")
+                values[key] = value.strip()
         with self._connect() as db:
             db.executemany("INSERT INTO preferences(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                            [(k, json.dumps(v)) for k, v in values.items()])
@@ -310,7 +401,7 @@ class Storage:
             # plus generous object/key/integer overhead for each row.
             db.execute("BEGIN")
             estimated = 512
-            meta_size = db.execute("SELECT coalesce(sum(length(CAST(value AS BLOB))),0) FROM metadata WHERE key LIKE 'message-source:%'").fetchone()[0]
+            meta_size = db.execute("SELECT coalesce(sum(length(CAST(value AS BLOB))+128),0) FROM metadata WHERE key GLOB 'message-source:*' OR key GLOB 'conversation:*'").fetchone()[0]
             estimated += meta_size * 6
             for name in ("messages", "memories", "tasks"):
                 text_columns = ("content", "created_at", "role") if name == "messages" else ("content", "created_at")
@@ -333,6 +424,7 @@ class Storage:
             for row in db.execute("SELECT key,value FROM preferences"):
                 preferences[row["key"]] = json.loads(row["value"])
             result["preferences"] = preferences
+            result["threads"] = [json.loads(row[0]) for row in db.execute("SELECT value FROM metadata WHERE key GLOB 'conversation:*' LIMIT 100")]
         return result
 
     def integrity(self) -> str:

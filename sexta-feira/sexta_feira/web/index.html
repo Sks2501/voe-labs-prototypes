@@ -1,63 +1,56 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"><meta name="theme-color" content="#0a1019"><meta name="description" content="SEXTA-FEIRA: sua assistente privada, executada no seu servidor.">
-<title>SEXTA-FEIRA · Seu espaço privado</title><link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"><meta name="theme-color" content="#212121"><meta name="description" content="SEXTA-FEIRA: sua assistente privada, executada no seu servidor.">
+<title>SEXTA-FEIRA</title><link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script>
 </head>
 <body>
-<header class="top">
- <div class="mark" aria-hidden="true">S<span></span></div>
- <div class="brand"><h1>SEXTA-FEIRA</h1><p id="model-brand">Seu espaço privado · no seu servidor</p></div>
- <span class="status" id="status" aria-live="polite">Desconectada</span>
- <button id="logout" type="button" class="quiet" hidden>Sair</button>
-</header>
 <div class="app-shell">
-<nav class="navigation" aria-label="Áreas da assistente">
- <p class="nav-caption">SEU ESPAÇO</p>
- <button type="button" data-view="chat" aria-controls="view-chat" aria-current="page"><span aria-hidden="true">◌</span>Conversa</button>
- <button type="button" data-view="memories" aria-controls="view-memories"><span aria-hidden="true">◇</span>Memórias</button>
- <button type="button" data-view="tasks" aria-controls="view-tasks"><span aria-hidden="true">✓</span>Tarefas</button>
- <button type="button" data-view="status" aria-controls="view-status"><span aria-hidden="true">▥</span>Modelo</button>
- <button type="button" data-view="settings" aria-controls="view-settings"><span aria-hidden="true">⚙</span>Ajustes</button>
- <div class="server-note"><span class="online-dot" aria-hidden="true"></span><strong>Processamento no servidor</strong><p>Seus dados ficam no seu ambiente. Sem inferência paga.</p></div>
-</nav>
+<button class="sidebar-backdrop" id="close-sidebar" type="button" aria-label="Fechar menu" hidden></button>
+<aside class="navigation" id="sidebar" aria-label="Menu da assistente">
+ <div class="sidebar-brand"><span class="brand-icon" aria-hidden="true">S<span>•</span></span><span>SEXTA-FEIRA</span><button id="hide-sidebar" class="icon-button" type="button" aria-label="Recolher menu">☰</button></div>
+ <button id="new-chat" class="new-conversation" type="button" disabled><span aria-hidden="true">＋</span> Nova conversa</button>
+ <nav class="nav-links" aria-label="Áreas da assistente"><button type="button" data-view="chat" aria-current="page"><span aria-hidden="true">◌</span> Conversa</button><button type="button" data-view="memories"><span aria-hidden="true">◇</span> Memórias</button><button type="button" data-view="tasks"><span aria-hidden="true">✓</span> Tarefas</button></nav>
+ <div class="conversation-heading">Suas conversas <span id="thread-count"></span></div>
+ <div id="conversation-list" class="conversation-list" aria-label="Conversas salvas"><p class="sidebar-empty">Entre para ver suas conversas.</p></div>
+ <button id="history" class="legacy-history" type="button" disabled>↶ Histórico anterior</button>
+ <div class="sidebar-bottom"><button type="button" data-view="profile" class="account-link"><span id="account-initial" class="avatar" aria-hidden="true">V</span><span><strong id="account-name">Sobre você</strong><small>Perfil e personalização</small></span></button><div class="bottom-links"><button type="button" data-view="status">Modelo</button><button type="button" data-view="settings">Ajustes</button></div><p>Privada · processamento no servidor</p></div>
+</aside>
+<div class="main-shell">
+<header class="top"><button id="show-sidebar" class="icon-button" type="button" aria-label="Abrir menu" aria-controls="sidebar" aria-expanded="false">☰</button><div class="brand"><h1>SEXTA-FEIRA <span aria-hidden="true">⌄</span></h1><p id="model-brand">Sua assistente privada</p></div><span class="status" id="status" aria-live="polite">Desconectada</span><button id="logout" type="button" class="quiet" hidden>Sair</button></header>
 <main id="workspace">
  <section id="view-chat" class="workspace-view chat" aria-labelledby="chat-title">
-  <div class="section-heading"><div><p class="eyebrow">VAMOS CONVERSAR</p><h2 id="chat-title">Como posso ajudar?</h2></div><button id="new-chat" type="button" class="quiet" disabled>＋ Nova conversa</button></div>
-  <form id="auth-form" class="auth">
-   <div class="auth-intro"><span class="lock-symbol" aria-hidden="true">◇</span><div><h3>Entre no seu espaço privado</h3><p>Use seu token de acesso. Ele fica apenas na memória desta página.</p></div></div>
-   <label for="token">Token de acesso</label>
-   <div class="auth-row"><input id="token" type="password" autocomplete="off" spellcheck="false" required placeholder="Cole seu token privado" aria-label="Token de acesso"><select id="role" aria-label="Tipo de sessão"><option value="user">Usuário</option><option value="admin">Administrador</option></select><button type="submit" id="connect">Entrar <span aria-hidden="true">→</span></button></div>
-  </form>
-  <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Histórico da conversa">
-   <article class="welcome"><span class="welcome-symbol" aria-hidden="true">✧</span><h3>Um lugar para pensar e organizar.</h3><p>Converse, acompanhe tarefas e guarde apenas o que você escolher.</p><div class="suggestions"><button type="button" data-prompt="/hora" disabled>Que horas são? <span aria-hidden="true">↗</span></button><button type="button" data-prompt="/tarefas" disabled>Ver minhas tarefas <span aria-hidden="true">↗</span></button></div></article>
-  </div>
-  <div id="processing" class="processing" hidden role="status"><span class="pulse" aria-hidden="true"></span><span id="processing-text">Pensando no servidor…</span></div>
-  <form id="chat-form" class="compose"><label for="prompt" class="sr">Mensagem para a SEXTA-FEIRA</label><textarea id="prompt" rows="2" maxlength="1600" placeholder="Escreva sua mensagem…" required disabled></textarea><button type="submit" id="send" disabled>Enviar <span aria-hidden="true">↑</span></button></form>
-  <div class="compose-note"><span>Enter envia · Shift + Enter cria uma linha</span><button class="text-button" id="stop-speech" type="button">Silenciar voz</button></div>
-  <p class="muted command-hint">Ferramentas: <code>/hora</code> <code>/tarefas</code> <code>/memorias</code> <code>/tarefa texto</code> <code>/lembrar texto</code></p>
+  <div class="chat-heading"><h2 id="chat-title" class="sr">Conversa com a SEXTA-FEIRA</h2><span id="conversation-title"></span><button id="rename-chat" class="icon-button" type="button" aria-label="Renomear conversa" hidden>✎</button></div>
+  <form id="auth-form" class="auth"><span class="auth-symbol" aria-hidden="true">S<span>•</span></span><h2>Seu espaço. Sua assistente.</h2><p>Entre para conversar com a SEXTA-FEIRA.</p><label for="token">Token de acesso</label><input id="token" type="password" autocomplete="off" spellcheck="false" required placeholder="Cole seu token privado"><div class="auth-actions"><select id="role" aria-label="Tipo de sessão"><option value="user">Usuário</option><option value="admin">Administrador</option></select><button type="submit" id="connect">Entrar →</button></div><small>Seu token fica apenas na memória desta página.</small></form>
+  <button id="thread-more" type="button" class="text-button" hidden>Carregar mensagens anteriores</button>
+  <div id="messages" class="messages" role="log" aria-live="polite" aria-label="Histórico da conversa"></div>
+  <div class="composer-area"><div id="processing" class="processing" hidden role="status"><span class="pulse" aria-hidden="true"></span><span id="processing-text">Pensando…</span></div><form id="chat-form" class="compose"><label for="prompt" class="sr">Mensagem para a SEXTA-FEIRA</label><textarea id="prompt" rows="1" maxlength="1600" placeholder="Pergunte qualquer coisa" required disabled></textarea><div class="compose-tools"><button id="commands-toggle" type="button" class="tool-button" aria-expanded="false" aria-controls="command-hint">＋ Ferramentas</button><button id="stop-speech" class="tool-button" type="button" aria-label="Silenciar voz">Silenciar</button><button type="submit" id="send" class="send-button" aria-label="Enviar mensagem" disabled>↑</button></div></form><p id="command-hint" class="command-hint" hidden>Ferramentas reais: <code>/hora</code> <code>/tarefas</code> <code>/memorias</code> <code>/tarefa texto</code> <code>/lembrar texto</code></p><p class="composer-caption">A SEXTA-FEIRA pode errar. Confira informações importantes.</p></div>
  </section>
- <section id="view-memories" class="workspace-view" aria-labelledby="memories-title" hidden>
+ <section id="view-memories" class="workspace-view page-view" aria-labelledby="memories-title" hidden>
   <div class="section-heading"><div><p class="eyebrow">O QUE IMPORTA PARA VOCÊ</p><h2 id="memories-title">Memórias</h2></div><span class="tag">Salvas por você</span></div>
   <p class="view-description">Informações que a SEXTA-FEIRA pode usar como contexto. Você pode editar ou excluir quando quiser.</p>
   <div class="panel"><form id="memory-form" class="stack"><label for="memory">Nova memória</label><input id="memory" maxlength="480" required placeholder="Ex.: prefiro respostas curtas e objetivas" disabled><button type="submit" disabled>Salvar memória</button></form><p id="memories-count" class="muted counter"></p><ul id="memories" class="entries"><li class="empty">Entre para consultar suas memórias.</li></ul><button id="memories-more" type="button" class="quiet" hidden>Carregar memórias anteriores</button></div>
  </section>
- <section id="view-tasks" class="workspace-view" aria-labelledby="tasks-title" hidden>
+ <section id="view-tasks" class="workspace-view page-view" aria-labelledby="tasks-title" hidden>
   <div class="section-heading"><div><p class="eyebrow">UM PASSO DE CADA VEZ</p><h2 id="tasks-title">Tarefas</h2></div><span class="tag">Sua organização</span></div>
   <p class="view-description">Registre o que precisa fazer e acompanhe as conclusões. Esta versão não envia lembretes automáticos.</p>
   <div class="panel"><form id="task-form" class="stack"><label for="task">Nova tarefa</label><input id="task" maxlength="480" required placeholder="O que precisa ser feito?" disabled><button type="submit" disabled>Adicionar tarefa</button></form><p id="tasks-count" class="muted counter"></p><ul id="tasks" class="entries"><li class="empty">Entre para consultar suas tarefas.</li></ul><button id="tasks-more" type="button" class="quiet" hidden>Carregar tarefas anteriores</button></div>
  </section>
- <section id="view-status" class="workspace-view" aria-labelledby="model-title" hidden>
+ <section id="view-profile" class="workspace-view page-view" aria-labelledby="profile-title" hidden>
+ <div class="section-heading"><div><p class="eyebrow">QUANTO MAIS CONTEXTO, MELHOR</p><h2 id="profile-title">Sobre você</h2></div><span class="tag">Você controla</span></div><p class="view-description">Conte o que deseja que eu saiba. Este perfil é usado nas suas conversas, fica no servidor e pode ser alterado ou apagado por você.</p>
+ <form id="profile-form" class="panel profile-form"><label for="preferred-name">Como devo chamar você?</label><input id="preferred-name" maxlength="80" placeholder="Seu nome ou apelido" disabled><label for="about-me">O que devo saber sobre você?</label><textarea id="about-me" maxlength="480" rows="3" placeholder="Seu trabalho, interesses e o que é importante para você" disabled></textarea><label for="goals">Em que você quer que eu ajude?</label><textarea id="goals" maxlength="400" rows="3" placeholder="Seus objetivos e prioridades" disabled></textarea><label for="response-style">Como prefere minhas respostas?</label><input id="response-style" maxlength="160" placeholder="Ex.: curtas, diretas e com exemplos" disabled><div class="actions"><button id="save-profile" type="submit" disabled>Salvar sobre você</button><button id="clear-profile" type="button" class="quiet" disabled>Limpar perfil</button></div><p class="muted">Só salvo aqui o que você informar. Senhas e tokens não devem fazer parte do perfil.</p></form><div class="personality-note"><span aria-hidden="true">✧</span><p><strong>O jeito SEXTA-FEIRA</strong>Calma, objetiva, atenta aos detalhes e com humor na medida. Inspirada na assistente do Tony Stark, com as capacidades reais do seu modelo local.</p></div>
+ </section>
+ <section id="view-status" class="workspace-view page-view" aria-labelledby="model-title" hidden>
   <div class="section-heading"><div><p class="eyebrow">TRANSPARÊNCIA EM TEMPO REAL</p><h2 id="model-title">Modelo e desempenho</h2></div><button id="refresh-status" type="button" class="quiet" disabled>↻ Atualizar</button></div>
   <p class="view-description">A IA roda no servidor da API. Os números abaixo são daquele servidor, não deste navegador.</p>
   <div class="panel"><dl id="model-status" class="metrics"><dt>Modelo</dt><dd>Entre para consultar</dd><dt>Execução</dt><dd>Servidor da API</dd><dt>Dispositivo</dt><dd>CPU do servidor</dd></dl><p id="metrics-note" class="muted">Métricas detalhadas exigem uma sessão de administrador.</p></div>
  </section>
- <section id="view-settings" class="workspace-view" aria-labelledby="settings-title" hidden>
+ <section id="view-settings" class="workspace-view page-view" aria-labelledby="settings-title" hidden>
   <div class="section-heading"><div><p class="eyebrow">DO SEU JEITO</p><h2 id="settings-title">Ajustes e privacidade</h2></div><span class="tag">PT-BR</span></div>
   <div class="settings-grid"><section class="panel"><h3>Voz no seu dispositivo</h3><label class="field"><span>Ler respostas com voz local</span><input type="checkbox" id="speak"></label><label class="field" for="voice-rate">Velocidade <select id="voice-rate"><option value="0.9">Lenta</option><option value="1" selected>Normal</option><option value="1.15">Rápida</option></select></label><p id="voice-note" class="muted">Somente vozes identificadas como locais são usadas. O modelo continua no servidor.</p><button class="quiet" type="button" disabled aria-describedby="microphone-note">Microfone indisponível</button><p id="microphone-note" class="muted">Reconhecimento de fala local ainda não foi instalado. Nenhum microfone é capturado.</p></section>
-  <section class="panel"><h3>Seus dados, sob seu controle</h3><p class="muted">Histórico, tarefas e memórias ficam no SQLite do servidor. A memória permanente só recebe o que você salva explicitamente.</p><div class="actions"><button id="export" type="button" class="quiet" disabled>Exportar meus dados</button><button id="history" type="button" class="quiet" disabled>Ver histórico anterior</button></div><p class="muted">Exportações contêm dados privados. O token não é salvo no armazenamento do navegador; Sair revoga a sessão atual.</p></section></div>
+  <section class="panel"><h3>Seus dados, sob seu controle</h3><p class="muted">Histórico, tarefas e memórias ficam no SQLite do servidor. A memória permanente só recebe o que você salva explicitamente.</p><div class="actions"><button id="export" type="button" class="quiet" disabled>Exportar meus dados</button></div><p class="muted">Exportações contêm dados privados. O token não é salvo no armazenamento do navegador; Sair revoga a sessão atual.</p></section></div>
  </section>
- <footer><span id="notice" role="status" aria-live="polite">Conecte-se para começar.</span><p>Modelo aberto no seu servidor. A IA pode errar; confirme informações importantes.</p></footer>
-</main>
-</div>
+ <div id="notice" class="notice" role="status" aria-live="polite">Entre para começar.</div>
+</main></div></div>
+<dialog id="rename-dialog"><form id="rename-form"><h2>Renomear conversa</h2><label for="thread-name">Título</label><input id="thread-name" maxlength="80" required><div class="actions"><button id="cancel-rename" type="button" class="quiet">Cancelar</button><button type="submit">Salvar</button></div></form></dialog>
 </body></html>

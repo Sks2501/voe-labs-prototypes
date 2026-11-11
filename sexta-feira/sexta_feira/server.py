@@ -238,7 +238,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             parsed = urlsplit(self.path)
             path = self._canonical_path(parsed.path)
             self.query = {}
-            if parsed.fragment or (parsed.query and (path not in ("/api/v1/history", "/api/v1/memories", "/api/v1/tasks") or self.command != "GET")):
+            if parsed.fragment or (parsed.query and ((path not in ("/api/v1/history", "/api/v1/memories", "/api/v1/tasks") and not path.startswith("/api/v1/threads/")) or self.command != "GET")):
                 raise HTTPError(400, "query_not_supported", "Parâmetros de consulta não são aceitos.")
             if parsed.query:
                 self.query = parse_qs(parsed.query, strict_parsing=True)
@@ -312,10 +312,16 @@ class AssistantHandler(BaseHTTPRequestHandler):
         elif path == "/api/v1/state":
             self._json(200, {"history": db.history(30), "memories": db.memories(),
                              "tasks": db.tasks(), "preferences": db.preferences(),
-                             "model": model_status(), "role": principal.role, "counts": db.counts(),
+                             "model": model_status(), "role": principal.role, "counts": db.counts(), "threads": db.threads(),
                              "limits": {"memories": 100, "tasks": 200}})
         elif path == "/api/v1/model":
             self._json(200, model_status())
+        elif path == "/api/v1/threads":
+            self._json(200, {"threads": db.threads()})
+        elif path.startswith("/api/v1/threads/"):
+            item_id = path.rsplit("/", 1)[1]
+            limit, before = self._paging(100)
+            self._json(200, {"thread": db.thread(item_id), "history": db.thread_history(item_id, limit, before)})
         elif path == "/api/v1/history":
             limit = identifier(self.query.get("limit", ["30"])[0])
             if limit > 100:
@@ -356,19 +362,30 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if path == "/api/v1/sessions" and self.command == "POST":
             self._fields(data, {"role"})
             self._json(201, self.server.auth.create_session(principal, data.get("role", "user")))
+        elif path == "/api/v1/threads" and self.command == "POST":
+            self._fields(data, {"title"})
+            self._json(201, db.create_thread(data.get("title", "Nova conversa")))
+        elif path.startswith("/api/v1/threads/") and self.command == "PATCH":
+            self._fields(data, {"title"}, {"title"})
+            self._json(200, db.rename_thread(path.rsplit("/", 1)[1], data["title"]))
         elif path in ("/api/v1/conversations", "/api/v1/chat") and self.command == "POST":
-            self._fields(data, {"message", "context_after"}, {"message"})
+            self._fields(data, {"message", "context_after", "thread_id"}, {"message"})
             message = cleaned(data["message"], 1600)
             context_after = identifier(data["context_after"]) if "context_after" in data else None
+            thread_id = data.get("thread_id")
+            if "thread_id" in data:
+                db.thread(thread_id)
             result = execute_chat_command(message, db)
             if result is None:
-                history = db.history(8)
+                history = db.thread_history(thread_id, 8) if thread_id is not None else db.history(8)
                 if context_after is not None:
                     history = [item for item in history if item["id"] > context_after]
-                reply = brain.generate_reply(message, history, db.memories(), self.server.model_size)
+                reply = brain.generate_reply(message, history, db.memories(), self.server.model_size, preferences=db.preferences())
                 result = {"reply": reply, "source": brain.generated_source(), "generated": True,
                           "action_executed": False, "model": model_status().get("model")}
-            db.save_exchange(message, result["reply"], source=result.get("source"), model=result.get("model"))
+            db.save_exchange(message, result["reply"], source=result.get("source"), model=result.get("model"), thread_id=thread_id)
+            if thread_id:
+                result["thread_id"] = thread_id
             self._json(200, result)
         elif path == "/api/v1/memories" and self.command == "POST":
             self._fields(data, {"content"}, {"content"})
@@ -433,6 +450,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._updated(db.delete_memory(identifier(path.rsplit("/", 1)[1])))
         elif path.startswith("/api/v1/tasks/"):
             self._updated(db.delete_task(identifier(path.rsplit("/", 1)[1])))
+        elif path.startswith("/api/v1/threads/"):
+            self._updated(db.delete_thread(path.rsplit("/", 1)[1]))
         elif path == "/api/v1/history":
             self._json(200, {"deleted": db.delete_history()})
         else:
@@ -451,7 +470,10 @@ def openapi_document() -> dict:
     schemas = {
         "Message": {"type": "object", "required": ["message"], "additionalProperties": False,
                     "properties": {"message": {"type": "string", "minLength": 1, "maxLength": 1600},
-                                   "context_after": {"type": "integer", "minimum": 1}}},
+                                   "context_after": {"type": "integer", "minimum": 1},
+                                   "thread_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"}}},
+        "Thread": {"type": "object", "additionalProperties": False,
+                   "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 80}}},
         "Content": {"type": "object", "required": ["content"], "additionalProperties": False,
                     "properties": {"content": {"type": "string", "minLength": 1, "maxLength": 480}}},
         "TaskUpdate": {"type": "object", "minProperties": 1, "additionalProperties": False,
@@ -462,7 +484,11 @@ def openapi_document() -> dict:
         "Preferences": {"type": "object", "minProperties": 1, "additionalProperties": False,
                         "properties": {"voice_enabled": {"type": "boolean"},
                                        "voice_rate": {"type": "number", "minimum": 0.5, "maximum": 2},
-                                       "language": {"type": "string", "enum": ["pt-BR"]}}},
+                                       "language": {"type": "string", "enum": ["pt-BR"]},
+                                       "preferred_name": {"type": "string", "maxLength": 80},
+                                       "about_me": {"type": "string", "maxLength": 480},
+                                       "goals": {"type": "string", "maxLength": 400},
+                                       "response_style": {"type": "string", "maxLength": 160}}},
         "Tool": {"type": "object", "required": ["name", "parameters"], "additionalProperties": False,
                  "properties": {"name": {"type": "string", "enum": ["system_time", "list_tasks", "create_task", "list_memories", "save_memory"]},
                                 "parameters": {"type": "object"}}},
@@ -473,6 +499,8 @@ def openapi_document() -> dict:
     routes = {
         "/health": {"get": None}, "/state": {"get": None}, "/model": {"get": None},
         "/conversations": {"post": "Message"}, "/history": {"get": None, "delete": None},
+        "/threads": {"get": None, "post": "Thread"},
+        "/threads/{id}": {"get": None, "patch": "Thread", "delete": None},
         "/memories": {"get": None, "post": "Content"},
         "/memories/{id}": {"patch": "Content", "delete": None},
         "/tasks": {"get": None, "post": "Content"},
@@ -488,13 +516,15 @@ def openapi_document() -> dict:
     for route, methods in routes.items():
         entry = {}
         for method, schema in methods.items():
-            status = "201" if method == "post" and route in ("/sessions", "/memories", "/tasks", "/admin/backup") else "200"
+            status = "201" if method == "post" and route in ("/sessions", "/threads", "/memories", "/tasks", "/admin/backup") else "200"
             operation = {"responses": {status: {"description": "Operação concluída"},
                                         "default": {"description": "Erro consistente", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}}}
             if schema:
                 operation["requestBody"] = {"required": True, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/" + schema}}}}
             if "{id}" in route:
                 operation["parameters"] = [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer", "minimum": 1}}]
+                if route == "/threads/{id}":
+                    operation["parameters"][0]["schema"] = {"type": "string", "pattern": "^[a-f0-9]{32}$"}
             if route in ("/history", "/memories", "/tasks") and method == "get":
                 operation["parameters"] = [
                     {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 200 if route == "/tasks" else 100}},
@@ -504,7 +534,7 @@ def openapi_document() -> dict:
             entry[method] = operation
         paths[route] = entry
     return {"openapi": "3.1.0", "info": {"title": "SEXTA-FEIRA API privada", "version": "1.0.0",
-            "description": "Assistente experimental GPT-2 local, um proprietário, sem cobrança de inferência. Bearer obrigatório; sessões expiram em 12 horas."},
+            "description": "Assistente experimental local, um proprietário, sem cobrança de inferência. Bearer obrigatório; sessões expiram em 12 horas."},
             "servers": [{"url": "/api/v1"}], "security": [{"bearerAuth": []}],
             "paths": paths, "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}}, "schemas": schemas}}
 
