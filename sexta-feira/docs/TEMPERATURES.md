@@ -21,6 +21,8 @@ Fontes primárias: [Windows Storage](https://learn.microsoft.com/en-us/powershel
 
 ## Provedor opcional de temperatura CPU
 
+Na implantação de 11/11/2026, o proprietário autorizou a instalação. PawnIO 2.2.0 foi instalado com código zero, sem reinicialização, e o coletor passou a fornecer CPU pacote e dois núcleos. API autenticada, painel e disparos automáticos foram verificados. O sensor ACPI continua separado. O procedimento abaixo descreve preparação/ativação em um runtime identificado; não é necessário reinstalar para usar os sensores já ativos.
+
 `cpu-sensors.ps1 -RuntimeRoot ... -Action Prepare` baixa e verifica os artefatos oficiais, prepara uma pasta com escrita somente para SYSTEM/Administradores e inspeciona metadados da biblioteca. **Não executa o instalador nem abre hardware.**
 
 - [LibreHardwareMonitor 0.9.6](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases/tag/v0.9.6): SHA-256 do ZIP .NET Framework `086d9f1b5a99e643edc2cfaaac16051685b551e4c5ac0b32a57c58c0e529c001`.

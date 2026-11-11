@@ -2,6 +2,14 @@
 
 ## Atualização de implantação — 11/11/2026
 
+### Temperatura interna da CPU ativada após autorização
+
+O proprietário autorizou explicitamente instalar PawnIO 2.2.0 para ler a CPU. Instalador oficial com SHA-256 e Authenticode reconferidos; instalação silenciosa retornou código zero, sem solicitar reinicialização. O driver instalado 2.2.0 tem assinatura válida de Microsoft Windows Hardware Compatibility Publisher. A API permaneceu LocalService; somente o coletor SYSTEM utiliza o provedor. Não foram alteradas proteções do Windows nem a configuração de outros serviços.
+
+Foram obtidas leituras reais de CPU pacote e dos dois núcleos, distintas da zona ACPI genérica. Passaram a coleta inicial e disparos automáticos posteriores, com duração observada de aproximadamente 2–3 s e fechamento do provedor após cada execução. O endpoint HTTPS `/hardware`, a ferramenta, a resposta de chat e o painel em sessão user receberam os três sensores CPU, com fonte e horário, sem listar CPU como indisponível. GPU, RAM, placa-mãe e bateria continuam sem temperatura nesta integração; uso de RAM está disponível separadamente.
+
+Validados autenticação, rejeição de origem, restrição das métricas admin, exibição móvel, atualização automática e logout. Nenhum modelo novo foi carregado nem foi feita carga artificial de CPU. Serviços da API, inferência, túneis e produção mantiveram os mesmos PIDs durante a instalação do driver. O registro de autorização, hashes dos binários instalados, leituras e verificações permanece privado no runtime. Não foi reiniciado o servidor para testar um boot completo.
+
 ### CPU, RAM e disco disponíveis para o proprietário
 
 O endpoint autenticado `/hardware` e a ferramenta `server_hardware` foram implantados. Sessão user agora pode consultar uso total de CPU, RAM total/usada/disponível, RAM da IA/API e disco; `/metrics` continua exclusivo de admin. A saída permitida exclui PIDs, caminhos, portas, contadores administrativos e credenciais. O painel atualiza a cada 10 s enquanto visível. Solicitações operacionais diretas usam a ferramenta, sem gerar números pelo modelo.
@@ -10,7 +18,7 @@ No servidor, 80 testes descobertos: 75 passaram e cinco testes históricos de ch
 
 No HTTPS real, verificados login user, painel, atualização automática entre duas amostras, capacidades e uso de RAM/disco, leitura de CPU, requisição natural pelo chat, origem recusada, falta de autenticação recusada, `/metrics` recusado para user e logout. Viewports 390 × 700 e 360 × 640 sem transbordamento horizontal. Não houve teste físico em Android. Serviços/portas de produção e processo de inferência permaneceram com as mesmas identidades durante o deploy; apenas serviços próprios de API/túnel foram reiniciados. Backup consistente privado preservado.
 
-O provedor CPU opcional foi preparado no servidor: ZIP LibreHardwareMonitor 0.9.6 e instalador PawnIO 2.2.0 com SHA-256 conferidos, Authenticode válido do instalador e biblioteca .NET 0.9.6.0 carregada sem abrir hardware. A configuração ficou desativada, sem driver instalado. **Temperatura interna de CPU ainda não validada: ativação depende da autorização específica solicitada ao proprietário.** Não se declara temperatura de RAM/GPU ou acesso irrestrito ao hardware. Veja [TEMPERATURES.md](TEMPERATURES.md).
+Na preparação inicial, o provedor CPU opcional foi preparado no servidor: ZIP LibreHardwareMonitor 0.9.6 e instalador PawnIO 2.2.0 com SHA-256 conferidos, Authenticode válido do instalador e biblioteca .NET 0.9.6.0 carregada sem abrir hardware. A configuração ficou inicialmente desativada, aguardando autorização específica. A autorização posterior e a ativação bem-sucedida estão registradas acima. Não se declara temperatura de RAM/GPU ou acesso irrestrito ao hardware. Veja [TEMPERATURES.md](TEMPERATURES.md).
 
 ### Sensores de temperatura do servidor
 
