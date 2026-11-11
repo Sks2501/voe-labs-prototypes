@@ -145,13 +145,15 @@ async function refresh(latestResponse) {
 }
 async function refreshStatus() { const model = await request("/model"); let metrics = {}; if (role === "admin") metrics = await request("/metrics"); modelStatus(model, metrics);$("metrics-note").textContent=role==="admin" ? "Medidas reais no servidor. CPU é a média desde a última consulta; o modelo pode ficar ocioso entre mensagens." : "Métricas detalhadas exigem uma sessão de administrador."; }
 function localVoice() { return "speechSynthesis" in window ? speechSynthesis.getVoices().find(v => v.localService === true && v.lang.toLowerCase().startsWith("pt")) : undefined; }
+function nativeVoice() {try{return Boolean(window.SextaAndroid && window.SextaAndroid.hasLocalVoice());}catch{return false;}}
 function voiceAvailability() {
-  const available=Boolean(localVoice()); $("speak").disabled=!available || !accessToken; $("voice-rate").disabled=!available || !accessToken;
+  const available=nativeVoice() || Boolean(localVoice()); $("speak").disabled=!available || !accessToken; $("voice-rate").disabled=!available || !accessToken;
   if (!available) $("speak").checked=false;
   $("speak").parentElement.title=available ? "Síntese de voz local disponível." : "Não há voz local em português disponível neste navegador.";
 }
 function speak(text) {
-  if (!$("speak").checked || !("speechSynthesis" in window)) return;
+  if (!$("speak").checked) return;
+  if(nativeVoice()){window.SextaAndroid.speak(text,Number($("voice-rate").value));return;}
   const voice = localVoice();
   if (!voice) { notice("Não foi encontrada uma voz local em português. Nenhum áudio foi enviado a serviços externos."); return; }
   speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.voice = voice; utterance.lang = voice.lang; utterance.rate = Number($("voice-rate").value); speechSynthesis.speak(utterance);
@@ -161,7 +163,7 @@ $("auth-form").addEventListener("submit", async event => {
   try { const session = await request("/sessions", {role: $("role").value}); accessToken = session.token; role = session.role;contextInitialized=false;showAllHistory=false;connected(true);await refresh();await refreshStatus().catch(() => {});notice("Sessão privada iniciada. O modelo roda no seu servidor.");if(!window.matchMedia("(max-width:700px)").matches)$("prompt").focus(); }
   catch (error) { accessToken = ""; connected(false); notice(error.message); } finally { $("connect").disabled = false; }
 });
-$("logout").addEventListener("click", async () => { try { await request("/sessions/current", undefined, "DELETE"); } catch {} accessToken="";navigationSequence++;selectedThread=null;visibleMessages=[];profileDirty=false;fillProfile({});renderThreads([]);responseSources.clear();collections.memories=[];collections.tasks=[];counts.memories=0;counts.tasks=0;connected(false);$("messages").replaceChildren();$("memories").replaceChildren();$("tasks").replaceChildren();$("model-brand").textContent="Sua assistente privada";$("model-status").replaceChildren();activateView("chat");if("speechSynthesis" in window) speechSynthesis.cancel();notice("Sessão encerrada."); });
+$("logout").addEventListener("click", async () => { try { await request("/sessions/current", undefined, "DELETE"); } catch {} accessToken="";navigationSequence++;selectedThread=null;visibleMessages=[];profileDirty=false;fillProfile({});renderThreads([]);responseSources.clear();collections.memories=[];collections.tasks=[];counts.memories=0;counts.tasks=0;connected(false);$("messages").replaceChildren();$("memories").replaceChildren();$("tasks").replaceChildren();$("model-brand").textContent="Sua assistente privada";$("model-status").replaceChildren();activateView("chat");stopSpeech();notice("Sessão encerrada."); });
 $("chat-form").addEventListener("submit", async event => {
   event.preventDefault(); if (busy || !accessToken) return; const text = $("prompt").value.trim(); if (!text) return;
   const currentToken=accessToken; busy = true; $("send").disabled = true;$("new-chat").disabled=true; $("processing").hidden = false; $("prompt").value = ""; message("user", text); notice("Gerando resposta no servidor…");
@@ -176,15 +178,16 @@ const pendingForms=new Set();
 for (const [form,input,path,label] of [["memory-form","memory","memories","Memória salva."],["task-form","task","tasks","Tarefa criada."]]) $(form).addEventListener("submit", async event => { event.preventDefault();if(pendingForms.has(form)) return;pendingForms.add(form);$(form).querySelector("button").disabled=true;try { await request("/"+path,{content:$(input).value}); $(input).value=""; await refresh(); notice(label); } catch(error) { notice(error.message); }finally{pendingForms.delete(form);collectionControls(path);} });
 async function savePreferences() { if (!accessToken) return; try { await request("/preferences",{voice_enabled:$("speak").checked,voice_rate:Number($("voice-rate").value)},"PATCH"); } catch(error) { notice(error.message); } }
 $("speak").addEventListener("change", savePreferences); $("voice-rate").addEventListener("change", savePreferences);
-$("stop-speech").addEventListener("click", () => { if ("speechSynthesis" in window) speechSynthesis.cancel(); });
+function stopSpeech(){if("speechSynthesis" in window)speechSynthesis.cancel();try{window.SextaAndroid?.stopSpeech();}catch{}}
+$("stop-speech").addEventListener("click",stopSpeech);
 $("refresh-status").addEventListener("click", async () => { try { await refreshStatus(); notice("Estado atualizado."); } catch(error) { notice(error.message); } });
 $("history").addEventListener("click", async () => { if(busy)return;try { const data=await request("/history?limit=100");selectedThread=null;showAllHistory=true;visibleMessages=data.history || [];renderThreads(threadItems);history(visibleMessages);$("thread-more").hidden=true;activateView("chat");notice("Histórico geral preservado (até 100 mensagens). Enviar uma mensagem inicia uma conversa separada."); } catch(error) { notice(error.message); } });
-$("export").addEventListener("click", async () => { try { const data = await request("/export"); const url = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"})); const a=document.createElement("a"); a.href=url; a.download="sexta-feira-dados-"+new Date().toISOString().slice(0,10)+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); notice("Exportação solicitada ao navegador. O arquivo contém dados privados."); } catch(error) { notice(error.message); } });
+$("export").addEventListener("click", async () => { try { const data = await request("/export"); if(window.SextaAndroid && typeof window.SextaAndroid.exportJson === "function"){window.SextaAndroid.exportJson(JSON.stringify(data,null,2));notice("Escolha no Android onde salvar sua exportação privada.");return;}const url = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"})); const a=document.createElement("a"); a.href=url; a.download="sexta-feira-dados-"+new Date().toISOString().slice(0,10)+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); notice("Exportação solicitada ao navegador. O arquivo contém dados privados."); } catch(error) { notice(error.message); } });
 $("prompt").addEventListener("keydown", event => { if(event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("chat-form").requestSubmit(); } });
 $("new-chat").addEventListener("click",()=>{if(busy || !accessToken)return;navigationSequence++;selectedThread=null;showAllHistory=false;visibleMessages=[];renderThreads(threadItems);history([]);$("thread-more").hidden=true;$("prompt").value="";resizePrompt();activateView("chat");if(!window.matchMedia("(max-width:700px)").matches)$("prompt").focus();});
 document.querySelectorAll(".navigation [data-view]").forEach(button=>button.addEventListener("click",()=>activateView(button.dataset.view)));
 $("workspace").addEventListener("click",event=>{const button=event.target.closest("[data-prompt]");if(!button || !accessToken || busy) return;$("prompt").value=button.dataset.prompt;$("chat-form").requestSubmit();});
-window.addEventListener("pagehide", () => { accessToken=""; if("speechSynthesis" in window) speechSynthesis.cancel(); });
+window.addEventListener("pagehide", () => { accessToken=""; stopSpeech(); });
 
 voiceAvailability();
 if("speechSynthesis" in window) speechSynthesis.addEventListener("voiceschanged",voiceAvailability);
@@ -225,3 +228,10 @@ $("commands-toggle").addEventListener("click",()=>{const hidden=!$("command-hint
 function resizePrompt(){$("prompt").style.height="auto";$("prompt").style.height=Math.min($("prompt").scrollHeight,window.matchMedia("(max-width:700px)").matches ? 125 : 160)+"px";}
 $("prompt").addEventListener("input",resizePrompt);
 syncSidebar();
+
+window.addEventListener("sexta-native-voice",voiceAvailability);
+let glassEnabled=/SextaFeiraAndroid\//.test(navigator.userAgent);
+try{const stored=localStorage.getItem("sexta-appearance");if(stored)glassEnabled=stored==="glass";}catch{}
+function applyAppearance(enabled){document.body.classList.toggle("glass-theme",enabled);$("glass-style").checked=enabled;}
+$("glass-style").addEventListener("change",()=>{const enabled=$("glass-style").checked;applyAppearance(enabled);try{localStorage.setItem("sexta-appearance",enabled ? "glass" : "classic");}catch{}});
+applyAppearance(glassEnabled);

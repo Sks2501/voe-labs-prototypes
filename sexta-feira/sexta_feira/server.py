@@ -5,8 +5,10 @@ explícitas, não cookies: requisições cross-origin não recebem CORS e são n
 """
 from __future__ import annotations
 import json
+import hashlib
 import logging
 import os
+import re
 from pathlib import Path
 import shutil
 import socket
@@ -157,11 +159,13 @@ class AssistantHandler(BaseHTTPRequestHandler):
     def log_error(self, format, *args):
         LOGGER.warning("http_protocol_error")
 
-    def _send(self, status: int, data: bytes, content_type: str) -> None:
+    def _send(self, status: int, data: bytes, content_type: str, *, download_name=None) -> None:
         self.close_connection = True
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        if download_name:
+            self.send_header("Content-Disposition", 'attachment; filename="' + download_name + '"')
         self.send_header("Connection", "close")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -176,7 +180,39 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if status == 401:
             self.send_header("WWW-Authenticate", 'Bearer realm="SEXTA-FEIRA"')
         self.end_headers()
-        self.wfile.write(data)
+        if self.command != "HEAD":
+            self.wfile.write(data)
+
+    def _android_release(self):
+        """Public installer only. No token, database or arbitrary filesystem route."""
+        directory = self.server.storage.path.parent / "android-release"
+        try:
+            with (directory / "android-release.json").open("rb") as stream:
+                raw = stream.read(8193)
+            if len(raw) > 8192 or directory.is_symlink():
+                raise ValueError("Invalid release descriptor")
+            release = json.loads(raw)
+            filename = release["filename"]
+            if not isinstance(filename, str) or not re.fullmatch(r"sexta-feira-android-\d+\.\d+\.\d+\.apk", filename):
+                raise ValueError("Invalid APK name")
+            if not re.fullmatch(r"\d{1,3}\.\d{1,3}\.\d{1,3}", release["version"]):
+                raise ValueError("Invalid release version")
+            if release["package"] != "online.teambike.sextafeira" or release["min_sdk"] != 26:
+                raise ValueError("Unexpected Android application")
+            if isinstance(release["bytes"], bool) or not isinstance(release["bytes"], int) or not 0 < release["bytes"] <= 10 * 1024**2:
+                raise ValueError("APK exceeds release size limit")
+            if not re.fullmatch(r"[a-f0-9]{64}", release["sha256"]) or not re.fullmatch(r"[a-f0-9]{64}", release["certificate_sha256"]):
+                raise ValueError("Invalid release hash")
+            path = (directory / filename).resolve()
+            if not path.is_relative_to(directory.resolve()) or path.stat().st_size != release["bytes"]:
+                raise ValueError("Release path/size mismatch")
+            with path.open("rb") as stream:
+                data = stream.read(10 * 1024**2 + 1)
+            if len(data) != release["bytes"] or hashlib.sha256(data).hexdigest() != release["sha256"]:
+                raise ValueError("APK integrity mismatch")
+            return release, data
+        except (OSError, ValueError, KeyError, TypeError):
+            raise HTTPError(503, "android_not_ready", "O instalador Android ainda não está disponível.") from None
 
     def _json(self, code: int, obj: dict | list) -> None:
         self._send(code, json.dumps(obj, ensure_ascii=False, allow_nan=False).encode("utf-8"),
@@ -246,7 +282,21 @@ class AssistantHandler(BaseHTTPRequestHandler):
                     raise ValueError("Parâmetros inválidos.")
             assets = {"/": ("index.html", "text/html; charset=utf-8"),
                       "/styles.css": ("styles.css", "text/css; charset=utf-8"),
-                      "/app.js": ("app.js", "text/javascript; charset=utf-8")}
+                      "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+                      "/android-icon.svg": ("android-icon.svg", "image/svg+xml")}
+            if self.command in ("GET", "HEAD") and path in ("/android", "/android/release.json", "/downloads/sexta-feira-android.apk"):
+                release, apk = self._android_release()
+                if path == "/downloads/sexta-feira-android.apk":
+                    self._send(200, apk, "application/vnd.android.package-archive", download_name=release["filename"])
+                elif path == "/android/release.json":
+                    self._json(200, {key: release[key] for key in ("version", "package", "bytes", "min_sdk", "sha256", "certificate_sha256")})
+                else:
+                    html = (WEB_DIR / "android.html").read_text(encoding="utf-8")
+                    for key, value in {"VERSION": release["version"], "SIZE": str(round(len(apk) / 1024)),
+                                       "SHA256": release["sha256"], "CERTIFICATE": release["certificate_sha256"]}.items():
+                        html = html.replace("{{" + key + "}}", value)
+                    self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+                return
             if self.command == "GET" and path in assets:
                 filename, kind = assets[path]
                 self._send(200, (WEB_DIR / filename).read_bytes(), kind)
@@ -458,6 +508,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             raise HTTPError(404, "not_found", "Rota inexistente.")
 
     do_GET = _dispatch
+    do_HEAD = _dispatch
     do_POST = _dispatch
     do_PATCH = _dispatch
     do_DELETE = _dispatch

@@ -24,4 +24,13 @@ reports/private/
 *.pfx
 *.pem
 *.key
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p12
+*.dpapi
+android/.gradle/
+android/local.properties
+android/build/
 service-config.json
