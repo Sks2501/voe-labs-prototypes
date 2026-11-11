@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "version_code": 1,
+  "package": "online.teambike.sextafeira",
+  "min_android": "8.0",
+  "min_sdk": 26,
+  "target_sdk": 35,
+  "bytes": 25221,
+  "sha256": "bdeef54e9a0c827102230e860a4a17c4b3c510b3b4e0b9ad1455df26782ca5b0",
+  "filename": "sexta-feira-android-1.0.0.apk",
+  "api_origin": "https://sexta.teambike.online",
+  "native_origin_checks": 14,
+  "sdk_build_tools": "35.0.0",
+  "certificate_sha256": "7ec80c56c4d5ecacd203cd3e6a78150384857ebdc6d3d7b3319f741e87868e60"
+}

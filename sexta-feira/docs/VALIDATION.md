@@ -2,6 +2,45 @@
 
 ## Atualização de implantação — 11/11/2026
 
+### Android e Liquid Glass — revisão posterior
+
+O proprietário pediu APK Android para download e confirmou o visual Liquid Glass.
+Foi criado um cliente WebView Java/API26+, com origem HTTPS restrita, sem modelo ou
+token embutido, sem microfone/câmera/contatos e sem bibliotecas de publicidade.
+Ponte nativa limitada a voz local e exportação com seletor do Android; não oferece
+shell, leitura arbitrária de arquivos ou acesso a credenciais.
+
+O SDK existente compilou o APK 1.0.0 universal, **25.221 bytes**, minSDK26/target35.
+`apksigner` verificou assinaturas v2/v3; `zipalign` e manifesto passaram. Os 14 casos
+da política de origem passaram em Java. SHA-256 do APK distribuído:
+`bdeef54e9a0c827102230e860a4a17c4b3c510b3b4e0b9ad1455df26782ca5b0`.
+Certificado público SHA-256:
+`7ec80c56c4d5ecacd203cd3e6a78150384857ebdc6d3d7b3319f741e87868e60`.
+Chave/senha ficaram em diretório privado com ACL/DPAPI, fora do Git e servidor web.
+
+Os **69 testes Python passaram no Dell em 10,440 s**, sem ignorados, incluindo
+quatro testes de download GET/HEAD, manifesto, hash, caminho e proteção da API.
+O download HTTPS real foi lido sem autenticação e seu tamanho/MIME/hash conferidos.
+Uma requisição com formato de User-Agent WebView retornou 200; isso não equivale
+a executar o APK em um aparelho. A API privada continua bloqueando acessos sem token.
+
+No navegador 390×700 foram conferidos landing de download, login, aparência de vidro,
+menu e compositor sem overflow horizontal. Tema de vidro terminou com compositor em
+700 px e largura 390 px. Sem erros JavaScript capturados; sessão de QA revogada.
+O tema padrão do APK é vidro e pode ser trocado nos Ajustes. Só a escolha visual é
+persistida localmente; token continua na memória da página. O teste é do frontend,
+não uma captura nativa de Android.
+
+Houve backup consistente e atualização somente do projeto. Modelo nativo, túnel de
+produção e serviços Team Bike foram preservados. Não foi criada outra rota DNS,
+porta pública ou recurso pago. `/android` e o instalador são públicos por autorização
+do proprietário, sem conter credenciais ou acesso aos dados pessoais.
+
+Não havia Android conectado e nenhuma instalação física foi realizada. TTS audível,
+file picker, teclado/insets, rotação e ciclo de vida em aparelho ainda precisam de
+teste no dispositivo. A compilação não foi apresentada como comprovação dessas
+funções. O APK não inclui todas as capacidades do ChatGPT ou da personagem fictícia.
+
 ### Revisão posterior: conversas e personalização
 
 O proprietário pediu interface com padrão visual de chat, comportamento inspirado

@@ -11,6 +11,13 @@ da instalação vem de um arquivo privado criado por `python -m sexta_feira init
 O servidor não imprime o segredo. A interface de login e seus arquivos estáticos
 podem ser carregados sem autenticação; não contêm dados pessoais.
 
+Por solicitação do proprietário, o instalador também é público fora de `/api/v1`:
+`GET /android` (instruções), `GET /android/release.json` (metadados públicos) e
+`GET`/`HEAD /downloads/sexta-feira-android.apk` (APK verificado). O serviço aceita
+somente o nome de release previsto, até 10 MiB, tamanho e SHA-256 correspondentes.
+Não há download de caminhos arbitrários. A disponibilidade do instalador não
+concede sessão ou acesso à API. Veja [Android](../android/README.md).
+
 `POST /api/v1/sessions` recebe `{ "role": "user" }` ou `admin`, autenticado por uma
 credencial válida. A resposta contém um novo `token`, `id`, `role` e `expires_at`
 (timestamp Unix). O token é mostrado somente nesta resposta e o SQLite guarda seu
