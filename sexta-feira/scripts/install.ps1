@@ -94,7 +94,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Official model download or validation failed.' }
     $report.weights='download_verified'
   } else { $report.weights='skipped_explicitly' }
-  & $venvPython -m unittest discover -s tests -v
+  # unittest normally writes successful progress to stderr. Windows PowerShell
+  # 5.1 can treat that as NativeCommandError when an installer is piped to a log.
+  & $venvPython (Join-Path $PSScriptRoot 'run_tests.py')
   if ($LASTEXITCODE -ne 0) { throw 'Automated tests failed; service was not installed.' }
   $report.tests='passed (read test output for skipped cases)'
   if (-not $SkipWeights) {
