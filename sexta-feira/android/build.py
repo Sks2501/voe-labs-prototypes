@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
+import xml.etree.ElementTree as ET
 
 
 def main():
@@ -17,6 +18,11 @@ def main():
         parser.add_argument('--'+name,type=Path,required=True)
     args=parser.parse_args()
     source=Path(__file__).resolve().parent/'app'/'src'/'main'
+    manifest=ET.parse(source/'AndroidManifest.xml').getroot()
+    namespace='{http://schemas.android.com/apk/res/android}'
+    version=manifest.attrib[namespace+'versionName'];version_code=int(manifest.attrib[namespace+'versionCode'])
+    if not re.fullmatch(r'\d+\.\d+\.\d+',version):raise ValueError('Invalid release version')
+    filename='sexta-feira-android-'+version+'.apk'
     output=args.output.resolve();output.mkdir(parents=True,exist_ok=True)
     if shutil.disk_usage(output).free<512*1024**2:
         raise RuntimeError('At least 512 MiB free required on build volume')
@@ -48,7 +54,7 @@ def main():
     with zipfile.ZipFile(unsigned,'a',compression=zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(dex.glob('*.dex')):archive.write(path,path.name)
     run(tools/'zipalign.exe','-f','4',unsigned,aligned)
-    apk=work/'sexta-feira-android-1.0.0.apk'
+    apk=work/filename
     signer=tools/'lib'/'apksigner.jar'
     run(java,'-jar',signer,'sign','--ks',args.signing_key,'--ks-key-alias','sexta-feira','--ks-pass','env:SEXTA_ANDROID_STOREPASS','--key-pass','env:SEXTA_ANDROID_STOREPASS','--out',apk,aligned)
     verified=subprocess.run([str(java),'-jar',str(signer),'verify','--verbose','--print-certs',str(apk)],check=True,env=env,cwd=work,capture_output=True,text=True)
@@ -59,11 +65,11 @@ def main():
     def file_hash(path):
         with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
     digest=file_hash(apk)
-    final=output/'sexta-feira-android-1.0.0.apk'
+    final=output/filename
     if final.exists() and file_hash(final)!=digest:
         raise RuntimeError('Existing release preserved; increment version instead of replacing a different APK')
     if not final.exists():shutil.copyfile(apk,final)
-    receipt={'version':'1.0.0','version_code':1,'package':'online.teambike.sextafeira','min_android':'8.0','min_sdk':26,
+    receipt={'version':version,'version_code':version_code,'package':'online.teambike.sextafeira','min_android':'8.0','min_sdk':26,
         'target_sdk':35,'bytes':final.stat().st_size,'sha256':digest,'filename':final.name,
         'api_origin':'https://sexta.teambike.online','native_origin_checks':14,'sdk_build_tools':'35.0.0','certificate_sha256':certificate}
     (output/'android-release.json').write_text(json.dumps(receipt,indent=2)+'\n',encoding='utf-8')

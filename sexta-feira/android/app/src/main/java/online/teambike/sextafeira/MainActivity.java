@@ -2,6 +2,8 @@ package online.teambike.sextafeira;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.net.Uri;
 import android.net.http.SslError;
@@ -40,6 +42,8 @@ public class MainActivity extends Activity {
     private Button retry;
     private TextToSpeech speech;
     private volatile boolean localVoiceReady = false;
+    private volatile boolean systemDark = false;
+    private int surfaceBackground = Color.WHITE;
     private byte[] pendingExport;
     private boolean destroyed = false;
     private boolean mainFrameFailed = false;
@@ -47,6 +51,7 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        systemDark=(getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.rgb(13,21,32));
@@ -63,6 +68,7 @@ public class MainActivity extends Activity {
             });
         }
         createStatus();
+        applySurface(systemDark ? "dark" : "light");
         createWebView();
         speech = new TextToSpeech(this, result -> ui.post(() -> configureVoice(result)));
         loadHome();
@@ -85,7 +91,7 @@ public class MainActivity extends Activity {
     }
 
     @SuppressWarnings("deprecation") private void createWebView() {
-        web = new WebView(this);web.setBackgroundColor(Color.rgb(13,21,32));
+        web = new WebView(this);web.setBackgroundColor(surfaceBackground);
         WebView.setWebContentsDebuggingEnabled(false);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
@@ -95,7 +101,9 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSupportMultipleWindows(false);
         settings.setMediaPlaybackRequiresUserGesture(true);settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setSafeBrowsingEnabled(true);
-        settings.setUserAgentString(settings.getUserAgentString()+" SextaFeiraAndroid/1.0.0");
+        settings.setUserAgentString(settings.getUserAgentString()+" SextaFeiraAndroid/1.0.1");
+        if(Build.VERSION.SDK_INT>=29)settings.setForceDark(WebSettings.FORCE_DARK_OFF);
+        if(Build.VERSION.SDK_INT>=33)settings.setAlgorithmicDarkeningAllowed(false);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
         web.addJavascriptInterface(new LocalActions(),"SextaAndroid");
         web.setWebChromeClient(new WebChromeClient() {
@@ -157,6 +165,32 @@ public class MainActivity extends Activity {
     private int dp(int value) { return (int)(value*getResources().getDisplayMetrics().density+0.5f); }
     private void toast(String text) { Toast.makeText(this,text,Toast.LENGTH_LONG).show(); }
 
+    private void applySurface(String theme) {
+        boolean dark="dark".equals(theme);
+        surfaceBackground=dark ? Color.rgb(16,16,16) : Color.WHITE;
+        root.setBackgroundColor(surfaceBackground);status.setBackgroundColor(surfaceBackground);
+        statusTitle.setTextColor(dark ? Color.WHITE : Color.rgb(23,23,23));
+        statusMessage.setTextColor(dark ? Color.rgb(170,170,170) : Color.rgb(110,110,110));
+        progress.setIndeterminateTintList(ColorStateList.valueOf(dark ? Color.WHITE : Color.BLACK));
+        retry.setTextColor(dark ? Color.WHITE : Color.BLACK);
+        if(web!=null)web.setBackgroundColor(surfaceBackground);
+        if(Build.VERSION.SDK_INT>=30) {
+            android.view.WindowInsetsController controller=getWindow().getInsetsController();
+            int flags=android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+            if(controller!=null)controller.setSystemBarsAppearance(dark ? 0 : flags,flags);
+        } else {
+            int flags=View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            int value=getWindow().getDecorView().getSystemUiVisibility();
+            getWindow().getDecorView().setSystemUiVisibility(dark ? value & ~flags : value | flags);
+            getWindow().setStatusBarColor(surfaceBackground);getWindow().setNavigationBarColor(surfaceBackground);
+        }
+    }
+    @Override public void onConfigurationChanged(Configuration config) {
+        super.onConfigurationChanged(config);
+        systemDark=(config.uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;
+        if(web!=null && OriginPolicy.isTrusted(web.getUrl()))web.evaluateJavascript("window.dispatchEvent(new Event('sexta-native-theme'));",null);
+    }
+
     private void configureVoice(int result) {
         if(destroyed || speech==null || result!=TextToSpeech.SUCCESS)return;
         try {
@@ -174,6 +208,11 @@ public class MainActivity extends Activity {
         if(web!=null && OriginPolicy.isTrusted(web.getUrl()))web.evaluateJavascript("window.dispatchEvent(new Event('sexta-native-voice'));",null);
     }
     public final class LocalActions {
+        @JavascriptInterface public String getSystemTheme() { return systemDark ? "dark" : "light"; }
+        @JavascriptInterface public void updateSurface(String theme) {
+            if(!"light".equals(theme) && !"dark".equals(theme))return;
+            ui.post(() -> {if(!destroyed && web!=null && OriginPolicy.isTrusted(web.getUrl()))applySurface(theme);});
+        }
         @JavascriptInterface public boolean hasLocalVoice() { return localVoiceReady; }
         @JavascriptInterface public void speak(String text,float rate) {
             if(text==null || text.length()>6000 || Float.isNaN(rate) || rate<0.5f || rate>2f)return;
