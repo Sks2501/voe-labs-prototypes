@@ -9,6 +9,7 @@ O código original OpenAI, sua licença, as adaptações e os pesos **GPT-2 124M
 - API REST privada `/api/v1`, Bearer obrigatório, sessões com expiração e revogação, papéis usuário/admin, OpenAPI autenticado, validação de origem/host e limites.
 - SQLite próprio com histórico, memórias explícitas editáveis/excluíveis, tarefas, preferências, exportação limitada, backup consistente e verificação de integridade.
 - Interface HTML/CSS/JS escura, responsiva, sem CDN, com estado real do modelo, fila e métricas administrativas. Token somente na memória da página.
+- Conversas separadas na lateral, títulos editáveis, contexto por conversa e perfil explícito em **Sobre você**. Estilo inspirado na SEXTA-FEIRA, sem capacidades fictícias. Veja [conversas e personalização](docs/CONVERSATIONS.md).
 - Voz com sintetizadores locais em português do navegador, quando disponíveis. Microfone desativado; Whisper ainda não instalado nem validado.
 - Uma instância nativa do modelo, uma inferência por vez, fila de duas, duas threads CPU, contexto total 2048, entrada até 1536 e geração até 192 tokens. Timeout de 90 s e reservas preventivas de RAM; prioridade BelowNormal.
 - Instalador Windows isolado, diagnóstico privado, logs rotativos, preparação de serviço LocalService via WinSW e procedimento de atualização/reversão.

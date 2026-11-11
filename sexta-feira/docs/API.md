@@ -31,6 +31,8 @@ hosts são validados e a API não libera CORS. Para um túnel, configure uma ún
 | `/model` | GET | Estado real do motor; não força carregamento dos pesos |
 | `/conversations` | POST | `{ "message": "texto", "context_after": 123 }`; modelo local ou comando explícito; corte opcional |
 | `/history` | GET, DELETE | Página de histórico ou exclusão do histórico |
+| `/threads` | GET, POST | Conversas do proprietário; criação com título opcional de até 80 caracteres |
+| `/threads/{id}` | GET, PATCH, DELETE | Mensagens paginadas, renomear com `title` ou excluir somente a conversa |
 | `/memories` | GET, POST | Página de memórias; criação com `{ "content": "texto" }` |
 | `/memories/{id}` | PATCH, DELETE | Correção com `content` ou exclusão |
 | `/tasks` | GET, POST | Página de tarefas; criação com `content` |
@@ -80,10 +82,22 @@ mensagens em metadados SQLite, incluídos no histórico e exportação. Registro
 sem origem permanecem sem atribuição inventada. O esquema continua versão 2.
 
 O campo opcional `context_after` aceita um ID inteiro positivo e restringe somente
-o histórico enviado ao modelo. Não apaga dados. A interface usa isso em Nova conversa;
-recarregar a página restaura o histórico recente. O corte configurado na troca do
+o histórico enviado ao modelo. Não apaga dados. É compatibilidade para clientes
+anteriores; a interface atual usa `thread_id`. O corte configurado na troca do
 backend mantém o histórico GPT-2 acessível em Ajustes, fora do contexto padrão.
 Não há agendador de notificações nem execução de shell.
+
+A interface atual cria conversas com `POST /threads` e envia `thread_id` (32 dígitos
+hexadecimais minúsculos) junto de `message` para `/conversations`. A resposta também
+informa esse ID. Somente o histórico dessa conversa entra no modelo. O endpoint
+legado sem ID continua aceito. Até 100 conversas; `GET /threads/{id}` aceita
+`limit` até 100 e `before`, assim como histórico. Sessões autorizadas compartilham
+o espaço do mesmo proprietário. Excluir conversa não exclui memórias ou tarefas.
+
+`PATCH /preferences` também aceita `preferred_name` (80 caracteres), `about_me`
+(480), `goals` (400), `response_style` (160). São textos explicitamente fornecidos,
+inclusive vazios para limpar; dados entram no contexto do backend Gemma e na
+exportação. Veja [personalização](CONVERSATIONS.md).
 
 ## Limites e proteção dos dados
 

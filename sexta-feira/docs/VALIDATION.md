@@ -2,6 +2,42 @@
 
 ## Atualização de implantação — 11/11/2026
 
+### Revisão posterior: conversas e personalização
+
+O proprietário pediu interface com padrão visual de chat, comportamento inspirado
+na SEXTA-FEIRA e contexto pessoal explícito. A revisão criou lateral de conversas,
+gaveta móvel, compositor fixo e perfil editável. Nenhum novo modelo, serviço pago
+ou mudança no hardware foi introduzido. A personalidade é contexto textual, não
+treinamento ou garantia de comportamento idêntico a uma personagem de ficção.
+
+Os **65 testes passaram no Dell em 10,511 s**, incluindo os pesos reais preservados
+e sete testes adicionais de perfil/conversas. Após o ajuste da especificação OpenAPI,
+os **20 testes da API passaram em 1,650 s**. JavaScript passou `node --check`.
+O backend de inferência nativo e o túnel de produção não foram reiniciados pela
+atualização. Houve backup consistente e troca somente dos arquivos relacionados.
+
+No navegador HTTPS foram testados login, perfil persistido, salvamento, criação de
+duas conversas, renomeação e reabertura sem mistura de mensagens. Uma geração real
+reconheceu o usuário a partir do perfil em 20,1 s. Em 390×700, o compositor terminou
+na borda inferior do viewport, houve rolagem interna e nenhuma ultrapassagem horizontal;
+o menu abriu/fechou e ficou inerte quando recolhido. A versão desktop também foi
+conferida. O perfil permanece privado no runtime; testes usam dados fictícios.
+
+API `/threads` requer autenticação, guarda grupos em metadados do esquema 2 e
+exporta suas relações com mensagens. Perfil tem limites de tamanho e aceita limpeza
+explícita. Exclusão de conversa remove somente seus dados; os testes de isolamento
+e preservação de registros legados passaram. Não foram extraídos dados de outros
+aplicativos para preencher o perfil. As pendências de voz, Access e avaliação ampla
+do modelo descritas abaixo permanecem aplicáveis.
+
+O ensaio HTTPS separado confirmou 401 sem credencial, isolamento, origem das
+mensagens, exportação e OpenAPI. Após reiniciar somente API/túnel próprios, perfil e
+conversas persistiram. O túnel respondeu 530 brevemente enquanto reconectava; após
+a reconexão o ensaio completo passou. Apenas os IDs descartáveis criados pelo
+verificador foram excluídos e a integridade final ficou `ok`. Novo login no navegador
+restaurou conversas, títulos e perfil; logout removeu esses dados da página e revogou
+a sessão de teste. Não houve erros JavaScript capturados.
+
 ### Estado mais recente: modelo moderno e interface revisada
 
 Após a insatisfação com o GPT-2, o proprietário autorizou fazer o possível sem
