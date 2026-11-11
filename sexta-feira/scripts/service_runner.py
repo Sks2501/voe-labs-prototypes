@@ -49,6 +49,7 @@ def main():
     os.environ["SEXTA_MODEL_DIR"]=config["model_dir"]
     os.environ["SEXTA_OFFLINE"]="1"
     os.environ["SEXTA_BACKEND"]=config.get("backend", "gpt2")
+    os.environ["SEXTA_TEMPERATURE_FILE"]=str(Path(sys.argv[2]).resolve().parent / "sensors" / "temperatures.json")
     for field, variable in (("native_url", "SEXTA_NATIVE_URL"), ("native_token_file", "SEXTA_NATIVE_TOKEN_FILE"),
                             ("history_after_id", "SEXTA_HISTORY_AFTER_ID")):
         if field in config: os.environ[variable]=str(config[field])

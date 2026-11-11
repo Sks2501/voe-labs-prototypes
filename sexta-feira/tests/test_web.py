@@ -66,6 +66,28 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(len(self.server.storage.thread_history(b["id"])), 2)
         self.assertEqual(self.call("POST", "/api/v1/conversations", {"message":"x", "thread_id":"not-an-id"}, token)[0], 400)
 
+    def test_temperature_api_authentication_and_chat_bypass_model(self):
+        token = "token-de-acesso-para-teste"
+        self.assertEqual(self.call("GET", "/api/v1/temperatures")[0], 401)
+        self.server.temperature_file = Path(self.dir.name)/"sensors.json"
+        from datetime import datetime, timezone
+        self.server.temperature_file.write_text(json.dumps({"schema_version":1,"scope":"server",
+            "observed_at_utc":datetime.now(timezone.utc).isoformat(),
+            "readings":[{"component":"storage","index":1,"celsius":38}]}),encoding="utf-8")
+        _, session = self.call("POST", "/api/v1/sessions", {"role":"user"}, token)
+        status, result = self.call("GET", "/api/v1/temperatures", token=session["token"])
+        self.assertEqual(status, 200)
+        self.assertEqual(result["scope"], "server")
+        self.assertEqual(result["readings"][0]["celsius"], 38)
+        with patch.object(brain,"generate_reply",side_effect=AssertionError("Thermal request must not use model")):
+            for message in ("/temperaturas", "Qual é a temperatura da VPS?"):
+                status, result = self.call("POST", "/api/v1/conversations", {"message":message}, session["token"])
+                self.assertEqual(status, 200)
+                self.assertEqual(result["tool"], "server_temperatures")
+                self.assertIn("38,0",result["reply"])
+        _, schema = self.call("GET", "/api/v1/openapi.json", token=token)
+        self.assertIn("/temperatures",schema["paths"])
+
     def test_health_requires_authentication(self):
         status, body = self.call("GET", "/api/health")
         self.assertEqual(status, 401)

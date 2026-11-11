@@ -129,3 +129,7 @@ Erros têm `{ "error": "mensagem", "code": "identificador" }`. Principais status
 de dados, 413 corpo/exportação excessivo, 415 tipo de conteúdo, 421 host inválido,
 429 frequência/fila/exportação ocupada, 503 indisponibilidade e 504 timeout de
 inferência. Erros internos não devolvem caminhos, detalhes de exceções ou segredos.
+
+## Temperaturas
+
+`GET /api/v1/temperatures` exige Bearer (user ou admin). Também disponível em `POST /api/v1/tools` como `server_temperatures`, sem parâmetros, e no chat por `/temperaturas`. São leituras do servidor, com origem, data, idade e componentes indisponíveis. Dados com mais de 180 s não retornam temperaturas atuais. Veja [TEMPERATURES.md](TEMPERATURES.md) para instalação isolada e limites dos sensores.

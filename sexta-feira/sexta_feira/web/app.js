@@ -137,7 +137,14 @@ async function refresh(latestResponse) {
   entries("memories",state.memories || []);entries("tasks",state.tasks || []);modelStatus(state.model || {});
   if (state.preferences) { $("speak").checked=!$("speak").disabled && state.preferences.voice_enabled===true;$("voice-rate").value=String(state.preferences.voice_rate || 1); }
 }
-async function refreshStatus() { const model = await request("/model"); let metrics = {}; if (role === "admin") metrics = await request("/metrics"); modelStatus(model, metrics);$("metrics-note").textContent=role==="admin" ? "Medidas reais no servidor. CPU é a média desde a última consulta; o modelo pode ficar ocioso entre mensagens." : "Métricas detalhadas exigem uma sessão de administrador."; }
+function temperatureStatus(snapshot) {
+  const rows = snapshot.status === "ok" ? snapshot.readings.map(item => [item.label,Number(item.celsius).toLocaleString("pt-BR",{maximumFractionDigits:1})+" °C"]) : [["Sensores",snapshot.status === "stale" ? "Coleta desatualizada" : "Indisponíveis agora"]];
+  for(const item of snapshot.unavailable || []) rows.push([item.label,"Sensor indisponível"]);
+  $("temperature-status").replaceChildren();
+  for(const [label,value] of rows){const dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=label;dd.textContent=value;$("temperature-status").append(dt,dd);}
+  $("temperature-note").textContent="A zona ACPI não identifica a temperatura interna da CPU. "+(snapshot.observed_at_utc ? "Coleta: "+new Date(snapshot.observed_at_utc).toLocaleString("pt-BR")+"; atualização a cada 60 s." : "Nenhum valor foi estimado.");
+}
+async function refreshStatus() { const model = await request("/model"); let metrics = {}; if (role === "admin") metrics = await request("/metrics"); modelStatus(model, metrics);temperatureStatus(await request("/temperatures"));$("metrics-note").textContent=role==="admin" ? "Medidas reais no servidor. CPU é a média desde a última consulta; o modelo pode ficar ocioso entre mensagens." : "Métricas detalhadas exigem uma sessão de administrador."; }
 function localVoice() { return "speechSynthesis" in window ? speechSynthesis.getVoices().find(v => v.localService === true && v.lang.toLowerCase().startsWith("pt")) : undefined; }
 function nativeVoice() {try{return Boolean(window.SextaAndroid && window.SextaAndroid.hasLocalVoice());}catch{return false;}}
 function voiceAvailability() {

@@ -2,11 +2,16 @@
 from __future__ import annotations
 from datetime import datetime
 from .storage import cleaned
+from .temperatures import is_temperature_request, read_temperatures, temperature_reply
 
 
-def execute_tool(name: str, parameters: dict, storage) -> dict:
+def execute_tool(name: str, parameters: dict, storage, *, temperature_file=None) -> dict:
     if not isinstance(parameters, dict):
         raise ValueError("parameters deve ser objeto.")
+    if name == "server_temperatures":
+        if parameters:
+            raise ValueError("server_temperatures não aceita parâmetros.")
+        return {**read_temperatures(temperature_file), "executed": True}
     if name == "system_time":
         if parameters:
             raise ValueError("system_time não aceita parâmetros.")
@@ -24,20 +29,23 @@ def execute_tool(name: str, parameters: dict, storage) -> dict:
     raise ValueError("Ferramenta inexistente ou não autorizada.")
 
 
-def execute_chat_command(message: str, storage) -> dict | None:
-    """Only an explicit user slash command can select a deterministic tool.
+def execute_chat_command(message: str, storage, *, temperature_file=None) -> dict | None:
+    """Explicit commands or a narrow read-only temperature request select tools.
 
     The caller must never pass generated model output to this function.
     """
     if not message.startswith("/"):
-        return None
+        if not is_temperature_request(message):
+            return None
+        message = "/temperaturas"
     parts = message.split(maxsplit=1)
     command = parts[0].lower()
     argument = parts[1].strip() if len(parts) > 1 else ""
     names = {"/hora": "system_time", "/tarefas": "list_tasks", "/memorias": "list_memories",
-             "/tarefa": "create_task", "/lembrar": "save_memory"}
+             "/tarefa": "create_task", "/lembrar": "save_memory",
+             "/temperatura": "server_temperatures", "/temperaturas": "server_temperatures", "/sensores": "server_temperatures"}
     if command not in names:
-        raise ValueError("Comando desconhecido. Use /hora, /tarefas, /memorias, /tarefa texto ou /lembrar texto.")
+        raise ValueError("Comando desconhecido. Use /hora, /temperaturas, /tarefas, /memorias, /tarefa texto ou /lembrar texto.")
     name = names[command]
     if name in ("create_task", "save_memory"):
         parameters = {"content": cleaned(argument, 480)}
@@ -45,8 +53,10 @@ def execute_chat_command(message: str, storage) -> dict | None:
         if argument:
             raise ValueError("Este comando não aceita argumentos.")
         parameters = {}
-    result = execute_tool(name, parameters, storage)
-    if name == "system_time":
+    result = execute_tool(name, parameters, storage, temperature_file=temperature_file)
+    if name == "server_temperatures":
+        reply = temperature_reply(result)
+    elif name == "system_time":
         now = datetime.fromisoformat(result["datetime"])
         reply = "Data e hora do servidor: " + now.strftime("%d/%m/%Y às %H:%M:%S") + " (UTC" + now.strftime("%z") + ")."
     elif name == "create_task":

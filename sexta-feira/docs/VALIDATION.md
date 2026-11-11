@@ -2,6 +2,18 @@
 
 ## Atualização de implantação — 11/11/2026
 
+### Sensores de temperatura do servidor
+
+Ferramenta `/temperaturas`, endpoint Bearer `/api/v1/temperatures`, botão no chat e painel de sensores implantados. O coletor isolado usa provedores nativos Windows, a cada minuto, sem driver adicional; a API continua LocalService. Foram confirmadas leituras de disco e zona ACPI, sem atribuir a zona à CPU nem classificar o equipamento como normal. CPU, GPU, RAM, placa-mãe e bateria continuam indisponíveis nesta integração.
+
+No servidor, a suíte passou: 75 testes descobertos, 70 executados e cinco testes históricos de checkpoint opt-in ignorados. Nenhuma nova carga de modelo foi necessária. Passaram validação de snapshot ausente, futuro, antigo, inválido e excessivo; rejeição de comandos/parâmetros; autenticação; sessão user; consulta no chat sem chamar o modelo; OpenAPI; persistência e regressões existentes. JavaScript passou sintaxe e oito verificações de renderização segura.
+
+A primeira coleta funcionou; a verificação da coleta seguinte encontrou conversão indevida de `$null` para caminho vazio em `File.Replace` no PowerShell 5.1. Corrigida com `[NullString]::Value`, validada por duas gravações consecutivas, execução SYSTEM e disparo automático posterior com resultado zero. A reinstalação também encontrou caminho COM com barra final; corrigido e validado por reinstalação idempotente. Coletas recentes demoraram cerca de 1,6 s, sem processo de sensores residente entre disparos.
+
+Login, botão Temperaturas, resposta determinística, painel e logout foram verificados no HTTPS, em viewport de 390 × 700, sem transbordamento horizontal. Não houve teste em aparelho físico Android nesta etapa. Aplicações de produção, banco e túnel preexistente mantiveram PIDs/portas durante a atualização; apenas API/túnel próprios foram reiniciados. Backup consistente do SQLite e cópia dos arquivos anteriores permaneceram privados no runtime. Temperaturas e credenciais não integram os registros públicos de validação.
+
+Para limites e manutenção: [TEMPERATURES.md](TEMPERATURES.md). Sensores internos adicionais exigem avaliação separada de provedor/driver e autorização adequada. O reconhecimento de voz e a proteção Cloudflare Access continuam fora desta alteração.
+
 ### Revisão 1.0.1 — visual móvel neutro e tema do sistema
 
 Após o feedback sobre o visual, foi usada a [referência móvel oficial](https://chatgpt.com/download/)

@@ -22,6 +22,7 @@ from .settings import (DATA_DIR, DEFAULT_MODEL, MAX_HTTP_CONNECTIONS,
 from .security import Authentication, RateLimiter
 from .storage import Storage, CapacityError, ExportTooLarge, cleaned, identifier
 from .tools import execute_tool, execute_chat_command
+from .temperatures import read_temperatures
 from .observability import configure_logging, resource_snapshot, native_resource_snapshot
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -49,10 +50,12 @@ class AssistantServer(ThreadingHTTPServer):
     request_queue_size = 8
 
     def __init__(self, address, token: str, model_size: str, storage: Storage, *,
-                 public_origin: str | None = None, rate_limit: int = 60):
+                 public_origin: str | None = None, rate_limit: int = 60, temperature_file: Path | None = None):
         if model_size not in MODELS:
             raise ValueError("Modelo inválido.")
         self.storage = storage
+        configured_sensor = os.environ.get("SEXTA_TEMPERATURE_FILE")
+        self.temperature_file = temperature_file or (Path(configured_sensor) if configured_sensor else None)
         self.auth = Authentication(storage, token, os.environ.get("SEXTA_USER_TOKEN"))
         self.model_size = model_size
         self._connections = threading.BoundedSemaphore(MAX_HTTP_CONNECTIONS)
@@ -366,6 +369,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
                              "limits": {"memories": 100, "tasks": 200}})
         elif path == "/api/v1/model":
             self._json(200, model_status())
+        elif path == "/api/v1/temperatures":
+            self._json(200, read_temperatures(self.server.temperature_file))
         elif path == "/api/v1/threads":
             self._json(200, {"threads": db.threads()})
         elif path.startswith("/api/v1/threads/"):
@@ -425,7 +430,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             thread_id = data.get("thread_id")
             if "thread_id" in data:
                 db.thread(thread_id)
-            result = execute_chat_command(message, db)
+            result = execute_chat_command(message, db, temperature_file=self.server.temperature_file)
             if result is None:
                 history = db.thread_history(thread_id, 8) if thread_id is not None else db.history(8)
                 if context_after is not None:
@@ -453,7 +458,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._json(200, db.set_preferences(data))
         elif path == "/api/v1/tools" and self.command == "POST":
             self._fields(data, {"name", "parameters"}, {"name", "parameters"})
-            self._json(200, execute_tool(data["name"], data["parameters"], db))
+            self._json(200, execute_tool(data["name"], data["parameters"], db, temperature_file=self.server.temperature_file))
         elif path == "/api/v1/admin/backup" and self.command == "POST":
             self._admin(principal)
             self._fields(data, set())
@@ -543,7 +548,7 @@ def openapi_document() -> dict:
                                        "goals": {"type": "string", "maxLength": 400},
                                        "response_style": {"type": "string", "maxLength": 160}}},
         "Tool": {"type": "object", "required": ["name", "parameters"], "additionalProperties": False,
-                 "properties": {"name": {"type": "string", "enum": ["system_time", "list_tasks", "create_task", "list_memories", "save_memory"]},
+                 "properties": {"name": {"type": "string", "enum": ["system_time", "list_tasks", "create_task", "list_memories", "save_memory", "server_temperatures"]},
                                 "parameters": {"type": "object"}}},
         "Empty": {"type": "object", "additionalProperties": False},
         "Error": {"type": "object", "required": ["error", "code"],
@@ -551,6 +556,7 @@ def openapi_document() -> dict:
     }
     routes = {
         "/health": {"get": None}, "/state": {"get": None}, "/model": {"get": None},
+        "/temperatures": {"get": None},
         "/conversations": {"post": "Message"}, "/history": {"get": None, "delete": None},
         "/threads": {"get": None, "post": "Thread"},
         "/threads/{id}": {"get": None, "patch": "ThreadUpdate", "delete": None},
