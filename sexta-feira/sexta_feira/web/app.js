@@ -4,6 +4,7 @@ const API = "/api/v1";
 let accessToken = "", role = "user", busy = false;
 let contextAfter = 0, lastMessageId = 0, contextInitialized = false, showAllHistory = false;
 let selectedThread=null, threadItems=[], visibleMessages=[], profileState={}, profileDirty=false, noticeTimer, navigationSequence=0;
+let statusRefreshInFlight=false;
 const profileFields={preferred_name:"preferred-name",about_me:"about-me",goals:"goals",response_style:"response-style"};
 const collections={memories:[],tasks:[]}, counts={memories:0,tasks:0}, limits={memories:100,tasks:200};
 const responseSources=new Map();
@@ -14,6 +15,7 @@ function activateView(name) {
   document.querySelectorAll(".workspace-view").forEach(panel => panel.hidden=panel.id!=="view-"+name);
   document.querySelectorAll(".navigation [data-view]").forEach(button => { if(button.dataset.view===name) button.setAttribute("aria-current","page"); else button.removeAttribute("aria-current"); });
   if(window.matchMedia("(max-width:700px)").matches) setSidebar(false);
+  if(name==="status" && accessToken) refreshStatus().catch(error=>notice(error.message));
 }
 function connected(value) {
   document.body.classList.toggle("is-connected",value);
@@ -144,7 +146,23 @@ function temperatureStatus(snapshot) {
   for(const [label,value] of rows){const dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=label;dd.textContent=value;$("temperature-status").append(dt,dd);}
   $("temperature-note").textContent="A zona ACPI não identifica a temperatura interna da CPU. "+(snapshot.observed_at_utc ? "Coleta: "+new Date(snapshot.observed_at_utc).toLocaleString("pt-BR")+"; atualização a cada 60 s." : "Nenhum valor foi estimado.");
 }
-async function refreshStatus() { const model = await request("/model"); let metrics = {}; if (role === "admin") metrics = await request("/metrics"); modelStatus(model, metrics);temperatureStatus(await request("/temperatures"));$("metrics-note").textContent=role==="admin" ? "Medidas reais no servidor. CPU é a média desde a última consulta; o modelo pode ficar ocioso entre mensagens." : "Métricas detalhadas exigem uma sessão de administrador."; }
+function hardwareStatus(r={}) {
+  const gib=value=>(Number(value)/1073741824).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})+" GiB";
+  const rows=[["CPU",r.cpu_model || "Não identificada"],["Processadores lógicos",r.cpu_logical ?? "Indisponível"],["Uso total da CPU",r.system_cpu_percent == null ? "Coletando amostra…" : Number(r.system_cpu_percent).toLocaleString("pt-BR",{maximumFractionDigits:1})+"%"]];
+  if(r.ram_total_bytes){rows.push(["RAM total",gib(r.ram_total_bytes)],["RAM em uso",gib(r.ram_total_bytes-r.ram_available_bytes)],["RAM disponível",gib(r.ram_available_bytes)]);}
+  if(r.process_rss_bytes!==undefined)rows.push(["RAM da IA + API",gib(r.process_rss_bytes)]);
+  if(r.inference_process_rss_bytes!==undefined)rows.push(["RAM do modelo",gib(r.inference_process_rss_bytes)]);
+  if(r.disk_total_bytes)rows.push(["Disco total",gib(r.disk_total_bytes)],["Disco em uso",gib(r.disk_total_bytes-r.disk_free_bytes)],["Disco disponível",gib(r.disk_free_bytes)]);
+  $("hardware-status").replaceChildren();for(const [label,value] of rows){const dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=label;dd.textContent=value;$("hardware-status").append(dt,dd);}
+  $("hardware-note").textContent="Uso total do servidor; CPU é a média entre amostras. "+(r.sampled_at_utc ? "Atualizado: "+new Date(r.sampled_at_utc).toLocaleTimeString("pt-BR")+". " : "")+"Atualização a cada 10 s neste painel; temperaturas a cada 60 s.";
+}
+async function refreshStatus() {
+  if(statusRefreshInFlight || !accessToken)return;
+  statusRefreshInFlight=true;const session=accessToken;
+  try{const [model,hardware]=await Promise.all([request("/model"),request("/hardware")]);let metrics={};if(role==="admin")metrics=await request("/metrics");if(session!==accessToken)return;modelStatus(model,metrics);hardwareStatus(hardware.resources);temperatureStatus(hardware.temperatures);$("metrics-note").textContent=role==="admin" ? "Métricas administrativas do processo da IA e da API." : "CPU, RAM, disco e sensores estão disponíveis abaixo na sua sessão.";}
+  finally{statusRefreshInFlight=false;}
+}
+setInterval(()=>{if(accessToken && !document.hidden && !$("view-status").hidden)refreshStatus().catch(error=>notice(error.message));},10000);
 function localVoice() { return "speechSynthesis" in window ? speechSynthesis.getVoices().find(v => v.localService === true && v.lang.toLowerCase().startsWith("pt")) : undefined; }
 function nativeVoice() {try{return Boolean(window.SextaAndroid && window.SextaAndroid.hasLocalVoice());}catch{return false;}}
 function voiceAvailability() {

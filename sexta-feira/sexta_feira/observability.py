@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes
+from datetime import datetime, timezone
 import json
 import logging
 from logging.handlers import RotatingFileHandler
@@ -15,6 +16,18 @@ _STARTED = time.monotonic()
 _SAMPLE_LOCK = threading.Lock()
 _PREVIOUS = None
 _NATIVE_PREVIOUS = None
+_SYSTEM_PREVIOUS = None
+
+
+def cpu_usage(idle: int, kernel: int, user: int, previous) -> float | None:
+    """Windows kernel time includes idle; percentages cover the whole server."""
+    if previous is None:
+        return None
+    total = kernel + user - previous[1] - previous[2]
+    inactive = idle - previous[0]
+    if total <= 0 or inactive < 0 or inactive > total:
+        return None
+    return round(100 * (total - inactive) / total, 2)
 
 
 def native_resource_snapshot(data_dir: Path) -> dict:
@@ -89,11 +102,12 @@ def configure_logging(data_dir: Path) -> None:
 
 def resource_snapshot(data_dir: Path | None = None) -> dict:
     """No addresses, filenames, environment, credentials or message content."""
-    global _PREVIOUS
+    global _PREVIOUS, _SYSTEM_PREVIOUS
     sampled_at, process_cpu = time.monotonic(), time.process_time()
     with _SAMPLE_LOCK:
         previous, _PREVIOUS = _PREVIOUS, (sampled_at, process_cpu)
     result = {"uptime_seconds": round(sampled_at - _STARTED, 2),
+              "sampled_at_utc": datetime.now(timezone.utc).isoformat(),
               "cpu_logical": os.cpu_count() or 1,
               "process_cpu_seconds": round(process_cpu, 3),
               "process_cpu_percent": None}
@@ -109,6 +123,28 @@ def resource_snapshot(data_dir: Path | None = None) -> dict:
             pass
     if os.name == "nt":
         from ctypes import wintypes
+        system_times = [wintypes.FILETIME() for _ in range(3)]
+        kernel_api = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel_api.GetSystemTimes.argtypes = [ctypes.POINTER(wintypes.FILETIME)] * 3
+        kernel_api.GetSystemTimes.restype = wintypes.BOOL
+        if kernel_api.GetSystemTimes(*(ctypes.byref(t) for t in system_times)):
+            values = tuple((t.dwHighDateTime << 32) + t.dwLowDateTime for t in system_times)
+            with _SAMPLE_LOCK:
+                previous_system = _SYSTEM_PREVIOUS
+                # Reuse a recent sample: simultaneous UI/API callers must not
+                # turn a sub-millisecond interval into a misleading percentage.
+                if previous_system is None or sampled_at - previous_system[0] >= 1:
+                    percent = cpu_usage(*values, previous_system[1] if previous_system else None)
+                    _SYSTEM_PREVIOUS = (sampled_at, values, percent)
+                else:
+                    percent = previous_system[2]
+            result["system_cpu_percent"] = percent
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
+                result["cpu_model"] = str(winreg.QueryValueEx(key, "ProcessorNameString")[0]).strip()[:160]
+        except OSError:
+            pass
 
         class MemoryStatus(ctypes.Structure):
             _fields_ = [("length", wintypes.DWORD), ("load", wintypes.DWORD)] + [

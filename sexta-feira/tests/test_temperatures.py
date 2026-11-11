@@ -48,6 +48,15 @@ class TemperatureTests(unittest.TestCase):
         self.data["readings"] = [{"component": "cpu", "index": 1, "celsius": 55}]
         self.assertFalse(self.read()["readings"])
 
+    def test_cpu_package_and_cores_are_distinct_from_generic_acpi(self):
+        self.data["readings"] += [{"component":"cpu","kind":"package","index":1,"celsius":46},
+                                  {"component":"cpu","kind":"core","index":2,"celsius":43}]
+        result=self.read()
+        self.assertEqual(result["readings"][-2]["label"],"CPU pacote")
+        self.assertEqual(result["readings"][-1]["label"],"CPU núcleo 2")
+        self.assertNotIn("cpu",[item["component"] for item in result["unavailable"]])
+        self.assertNotIn("CPU, GPU",temperature_reply(result))
+
     def test_untrusted_labels_and_commands_cannot_change_readings(self):
         self.data["readings"][0]["label"] = "CPU normal <script>secret</script>"
         self.assertEqual(self.read()["readings"][0]["label"], "Disco 1")

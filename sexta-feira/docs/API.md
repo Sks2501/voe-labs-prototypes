@@ -132,4 +132,6 @@ inferência. Erros internos não devolvem caminhos, detalhes de exceções ou se
 
 ## Temperaturas
 
+`GET /api/v1/hardware` exige Bearer (user ou admin) e mostra CPU total, RAM, disco, RAM da IA e temperaturas ao proprietário. Ferramenta `server_hardware` não aceita parâmetros. Comandos `/hardware`, `/cpu`, `/ram`, `/recursos` e `/status`; pedidos diretos sobre o estado do servidor também usam a ferramenta. Métricas administrativas continuam em `/metrics`, exclusivo de admin. Recursos não incluem caminhos, credenciais ou PIDs. CPU percentual é média entre amostras e não é temperatura.
+
 `GET /api/v1/temperatures` exige Bearer (user ou admin). Também disponível em `POST /api/v1/tools` como `server_temperatures`, sem parâmetros, e no chat por `/temperaturas`. São leituras do servidor, com origem, data, idade e componentes indisponíveis. Dados com mais de 180 s não retornam temperaturas atuais. Veja [TEMPERATURES.md](TEMPERATURES.md) para instalação isolada e limites dos sensores.

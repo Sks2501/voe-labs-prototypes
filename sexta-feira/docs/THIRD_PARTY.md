@@ -6,3 +6,8 @@
 - **WinSW:** versão 2.12.0, licença MIT. Python e dependências têm suas respectivas licenças; as versões estão nos arquivos de requisitos e nos scripts de provisionamento.
 
 A adoção do Gemma substitui a restrição inicial a um motor exclusivamente OpenAI por autorização posterior do proprietário para usar a alternativa local gratuita. O backend GPT-2 e sua procedência permanecem preservados. Nenhuma dessas organizações endossa esta aplicação.
+# Sensores opcionais
+
+LibreHardwareMonitor 0.9.6, MPL-2.0: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/tree/v0.9.6. Os binários oficiais e dependências ficam apenas no runtime, com SHA-256 do pacote e hashes de DLLs; não são publicados neste repositório. O código original da biblioteca não foi modificado.
+
+PawnIO 2.2.0: fonte GPL-2.0 em https://github.com/namazso/PawnIO e distribuição oficial assinada em https://github.com/namazso/PawnIO.Setup/releases/tag/2.2.0. O instalador oficial é obtido sem modificações; sua instalação no kernel exige autorização específica. Não se usa a edição unrestricted nem se transfere acesso ao driver à API.

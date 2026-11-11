@@ -1,4 +1,4 @@
-# Fixed, read-only collector. No arguments, network, drivers, fan controls or commands from the API.
+# Fixed collector. Optional approved CPU provider; no API arguments, network or fan control.
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 $watch=[Diagnostics.Stopwatch]::StartNew()
@@ -24,6 +24,15 @@ try {
   }
  }
 } catch {}
+$provider=Join-Path (Split-Path -Parent $PSScriptRoot) 'sensor-provider'
+if(Test-Path -LiteralPath (Join-Path $provider 'enabled.json')){
+ try {
+  $enabled=Get-Content -LiteralPath (Join-Path $provider 'enabled.json') -Raw | ConvertFrom-Json
+  if($enabled.enabled -eq $true -and $enabled.provider -eq 'lhm-0.9.6-pawnio-2.2.0'){
+   $readings+=@(& (Join-Path $provider 'read-cpu-temperatures.ps1'))
+  }
+ } catch {}
+}
 $snapshot=@{schema_version=1;scope='server';observed_at_utc=[DateTime]::UtcNow.ToString('o');readings=@($readings);collection_ms=$watch.ElapsedMilliseconds}
 $target=Join-Path $PSScriptRoot 'temperatures.json'
 $temporary=Join-Path $PSScriptRoot 'temperatures.tmp'

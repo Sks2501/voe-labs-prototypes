@@ -1,4 +1,8 @@
-# Temperaturas do servidor
+# Temperaturas e recursos do servidor
+
+`/hardware`, `/cpu`, `/ram`, `/recursos` ou `/status` retornam CPU, RAM, disco e temperaturas em uma resposta determinística. Pedidos diretos como “Como está o servidor?” usam a mesma ferramenta. `GET /api/v1/hardware` exige Bearer e oferece uma lista limitada de métricas ao proprietário em sessão user. O endpoint administrativo `/metrics` continua restrito. Não retorna PIDs, portas, processos de outros projetos, caminhos, tokens ou inventário de rede.
+
+O painel mostra modelo da CPU, processadores lógicos, uso total de CPU, RAM total/usada/disponível, RAM da IA/API e disco total/usado/livre. Atualiza a cada 10 s somente quando visível e autenticado, sem sobrepor requisições. Uso de CPU é calculado entre amostras `GetSystemTimes` (kernel inclui idle); a primeira amostra não inventa 0%. A RAM vem de `GlobalMemoryStatusEx`; disco é o volume de dados da aplicação. Unidades de capacidade: GiB, diferentes de °C.
 
 `/temperaturas`, `/temperatura` ou `/sensores` consultam medidas reais **do servidor da API**, inclusive no Android. Perguntas curtas como “Qual é a temperatura da VPS?” usam a mesma ferramenta determinística. A saída do modelo nunca é interpretada como chamada de ferramenta.
 
@@ -8,11 +12,25 @@ O botão **+ → Temperaturas** faz a consulta no chat. **Mais → Modelo e dese
 
 - `Get-StorageReliabilityCounter`: temperatura atual dos discos que oferecem o contador, em °C. Zero, nulo e máximos não suportados não viram leituras.
 - `MSAcpi_ThermalZoneTemperature`: zona térmica genérica, convertida de décimos de kelvin para °C: `valor / 10 - 273,15`. **Não é identificada como temperatura interna do processador.** O firmware pode fornecer valores pouco representativos ou constantes.
-- CPU, GPU, RAM, placa-mãe e bateria aparecem como indisponíveis: esta versão não implementa seus provedores. Não afirma que esses componentes estão frios, normais ou seguros.
+- CPU: provedor opcional LibreHardwareMonitor 0.9.6 + PawnIO 2.2.0, ativado somente após autorização específica do driver. Pacote e núcleos são identificados separadamente. Sem provedor ativo, aparece indisponível.
+- GPU, RAM, placa-mãe e bateria: temperatura não implementada; uso/capacidade de RAM continua disponível. Não afirma que os componentes estão frios, normais ou seguros.
 
 Em uma VM, os sensores físicos podem estar ausentes. Nenhuma medição é estimada. A coleta por minuto não detecta todos os picos e não substitui proteção térmica do hardware.
 
-Fontes primárias: [Windows Storage](https://learn.microsoft.com/en-us/powershell/module/storage/get-storagereliabilitycounter), [ACPI e zonas térmicas](https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/design-guide). A implementação não instala drivers adicionais. Provedores como LibreHardwareMonitor exigem avaliação separada de acesso ao hardware e autorização para eventual driver; nenhum WinRing0/PawnIO foi instalado.
+Fontes primárias: [Windows Storage](https://learn.microsoft.com/en-us/powershell/module/storage/get-storagereliabilitycounter), [ACPI e zonas térmicas](https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/design-guide), [GetSystemTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getsystemtimes). O coletor Windows básico não instala drivers. O provedor CPU tem instalação opcional separada; não utiliza WinRing0 nem altera políticas de segurança.
+
+## Provedor opcional de temperatura CPU
+
+`cpu-sensors.ps1 -RuntimeRoot ... -Action Prepare` baixa e verifica os artefatos oficiais, prepara uma pasta com escrita somente para SYSTEM/Administradores e inspeciona metadados da biblioteca. **Não executa o instalador nem abre hardware.**
+
+- [LibreHardwareMonitor 0.9.6](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases/tag/v0.9.6): SHA-256 do ZIP .NET Framework `086d9f1b5a99e643edc2cfaaac16051685b551e4c5ac0b32a57c58c0e529c001`.
+- [PawnIO 2.2.0 oficial](https://github.com/namazso/PawnIO.Setup/releases/tag/2.2.0): SHA-256 `1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032`; Authenticode válido, emissor do executável `namazso.eu`.
+
+Somente após autorização do proprietário: `cpu-sensors.ps1 -RuntimeRoot ... -Action Activate -AllowKernelDriver`. Instala edição oficial assinada via `-install -silent`; não habilita edição unrestricted, acesso para usuários comuns ou desativa proteções. Código 3010 interrompe a ativação sem reiniciar o servidor. Driver preexistente sem recibo próprio não é substituído.
+
+O coletor SYSTEM verifica o hash das DLLs, abre apenas o grupo CPU, lê temperatura do pacote/núcleos e fecha os recursos em `finally`. Grupos de controladores, placa-mãe, SPD de memória, GPU e ventoinhas ficam desativados. A API LocalService só lê o JSON, sem acesso ao driver. A preparação e o script não significam que houve leitura real: a ativação e o teste no hardware devem ser registrados no recibo privado.
+
+Para desabilitar somente a integração: `cpu-sensors.ps1 -RuntimeRoot ... -Action Disable`. O driver permanece preservado; sua remoção é operação administrativa separada e deve verificar se outro aplicativo o utiliza. Não há atualização automática dos binários.
 
 ## Instalação isolada no Windows
 

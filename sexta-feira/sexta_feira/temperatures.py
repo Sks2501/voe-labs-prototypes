@@ -10,7 +10,7 @@ import unicodedata
 MAX_AGE_SECONDS = 180
 LABELS = {"cpu": "Processador", "gpu": "GPU", "memory": "Memória RAM",
           "motherboard": "Placa-mãe", "battery": "Bateria"}
-SOURCES = {"storage": "Windows Storage", "acpi": "Windows ACPI"}
+SOURCES = {"storage": "Windows Storage", "acpi": "Windows ACPI", "cpu": "LibreHardwareMonitor 0.9.6 / PawnIO 2.2.0"}
 
 
 def read_temperatures(path: Path | None, *, now: datetime | None = None) -> dict:
@@ -50,9 +50,18 @@ def read_temperatures(path: Path | None, *, now: datetime | None = None) -> dict
             if type(index) is not int or not 1 <= index <= 32:
                 raise ValueError("Invalid index")
             # Labels and sources come from code, never from untrusted JSON strings.
+            if component == "cpu":
+                kind = item["kind"]
+                if kind not in ("package", "core"):
+                    raise ValueError("Unsupported CPU sensor")
+                label = "CPU pacote" if kind == "package" else "CPU núcleo " + str(index)
+            else:
+                label = ("Disco " if component == "storage" else "Zona térmica ACPI ") + str(index)
             result["readings"].append({"component": component,
-                "label": ("Disco " if component == "storage" else "Zona térmica ACPI ") + str(index),
+                "label": label,
                 "celsius": round(value, 1), "source": SOURCES[component]})
+        present = {item["component"] for item in result["readings"]}
+        result["unavailable"] = [item for item in result["unavailable"] if item["component"] not in present]
         if not result["readings"]:
             result["status"] = "unavailable"
         return result
@@ -69,7 +78,9 @@ def temperature_reply(snapshot: dict) -> str:
     for reading in snapshot["readings"]:
         value = f"{reading['celsius']:.1f}".replace(".", ",")
         lines.append(f"• {reading['label']}: {value} °C ({reading['source']}).")
-    lines.append("CPU, GPU, RAM, placa-mãe e bateria: sensores não disponibilizados nesta configuração.")
+    missing = ", ".join("CPU" if item["component"] == "cpu" else "RAM" if item["component"] == "memory" else item["label"] for item in snapshot["unavailable"])
+    if missing:
+        lines.append(missing + ": temperaturas não disponibilizadas nesta configuração.")
     lines.append("A zona ACPI não identifica a temperatura interna da CPU. Não é possível avaliar todos os componentes com essas leituras.")
     stamp = datetime.fromisoformat(snapshot["observed_at_utc"]).astimezone()
     lines.append("Coleta: " + stamp.strftime("%d/%m/%Y %H:%M:%S %z") + f"; há {snapshot['age_seconds']} s. Atualização a cada 60 s.")

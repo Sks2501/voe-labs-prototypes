@@ -3,11 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from .storage import cleaned
 from .temperatures import is_temperature_request, read_temperatures, temperature_reply
+from .hardware import is_hardware_request, hardware_reply
 
 
-def execute_tool(name: str, parameters: dict, storage, *, temperature_file=None) -> dict:
+def execute_tool(name: str, parameters: dict, storage, *, temperature_file=None, hardware_reader=None) -> dict:
     if not isinstance(parameters, dict):
         raise ValueError("parameters deve ser objeto.")
+    if name == "server_hardware":
+        if parameters:
+            raise ValueError("server_hardware não aceita parâmetros.")
+        return {**(hardware_reader() if hardware_reader else {"status":"unavailable"}), "executed": True}
     if name == "server_temperatures":
         if parameters:
             raise ValueError("server_temperatures não aceita parâmetros.")
@@ -29,21 +34,25 @@ def execute_tool(name: str, parameters: dict, storage, *, temperature_file=None)
     raise ValueError("Ferramenta inexistente ou não autorizada.")
 
 
-def execute_chat_command(message: str, storage, *, temperature_file=None) -> dict | None:
+def execute_chat_command(message: str, storage, *, temperature_file=None, hardware_reader=None) -> dict | None:
     """Explicit commands or a narrow read-only temperature request select tools.
 
     The caller must never pass generated model output to this function.
     """
     if not message.startswith("/"):
-        if not is_temperature_request(message):
+        if is_temperature_request(message):
+            message = "/temperaturas"
+        elif is_hardware_request(message):
+            message = "/hardware"
+        else:
             return None
-        message = "/temperaturas"
     parts = message.split(maxsplit=1)
     command = parts[0].lower()
     argument = parts[1].strip() if len(parts) > 1 else ""
     names = {"/hora": "system_time", "/tarefas": "list_tasks", "/memorias": "list_memories",
              "/tarefa": "create_task", "/lembrar": "save_memory",
-             "/temperatura": "server_temperatures", "/temperaturas": "server_temperatures", "/sensores": "server_temperatures"}
+             "/temperatura": "server_temperatures", "/temperaturas": "server_temperatures", "/sensores": "server_temperatures",
+             "/hardware": "server_hardware", "/status": "server_hardware", "/recursos": "server_hardware", "/cpu": "server_hardware", "/ram": "server_hardware"}
     if command not in names:
         raise ValueError("Comando desconhecido. Use /hora, /temperaturas, /tarefas, /memorias, /tarefa texto ou /lembrar texto.")
     name = names[command]
@@ -53,8 +62,10 @@ def execute_chat_command(message: str, storage, *, temperature_file=None) -> dic
         if argument:
             raise ValueError("Este comando não aceita argumentos.")
         parameters = {}
-    result = execute_tool(name, parameters, storage, temperature_file=temperature_file)
-    if name == "server_temperatures":
+    result = execute_tool(name, parameters, storage, temperature_file=temperature_file, hardware_reader=hardware_reader)
+    if name == "server_hardware":
+        reply = hardware_reply(result)
+    elif name == "server_temperatures":
         reply = temperature_reply(result)
     elif name == "system_time":
         now = datetime.fromisoformat(result["datetime"])

@@ -23,6 +23,7 @@ from .security import Authentication, RateLimiter
 from .storage import Storage, CapacityError, ExportTooLarge, cleaned, identifier
 from .tools import execute_tool, execute_chat_command
 from .temperatures import read_temperatures
+from .hardware import hardware_snapshot
 from .observability import configure_logging, resource_snapshot, native_resource_snapshot
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -135,6 +136,9 @@ class AssistantServer(ThreadingHTTPServer):
                 result["process_cpu_percent"] = round(own_cpu + model_cpu, 2) if own_cpu is not None and model_cpu is not None else None
                 result.update(native)
         return result
+
+    def hardware(self) -> dict:
+        return hardware_snapshot(self.metrics(), read_temperatures(self.temperature_file))
 
 
 class HTTPError(Exception):
@@ -371,6 +375,8 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._json(200, model_status())
         elif path == "/api/v1/temperatures":
             self._json(200, read_temperatures(self.server.temperature_file))
+        elif path == "/api/v1/hardware":
+            self._json(200, self.server.hardware())
         elif path == "/api/v1/threads":
             self._json(200, {"threads": db.threads()})
         elif path.startswith("/api/v1/threads/"):
@@ -430,7 +436,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             thread_id = data.get("thread_id")
             if "thread_id" in data:
                 db.thread(thread_id)
-            result = execute_chat_command(message, db, temperature_file=self.server.temperature_file)
+            result = execute_chat_command(message, db, temperature_file=self.server.temperature_file, hardware_reader=self.server.hardware)
             if result is None:
                 history = db.thread_history(thread_id, 8) if thread_id is not None else db.history(8)
                 if context_after is not None:
@@ -458,7 +464,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._json(200, db.set_preferences(data))
         elif path == "/api/v1/tools" and self.command == "POST":
             self._fields(data, {"name", "parameters"}, {"name", "parameters"})
-            self._json(200, execute_tool(data["name"], data["parameters"], db, temperature_file=self.server.temperature_file))
+            self._json(200, execute_tool(data["name"], data["parameters"], db, temperature_file=self.server.temperature_file, hardware_reader=self.server.hardware))
         elif path == "/api/v1/admin/backup" and self.command == "POST":
             self._admin(principal)
             self._fields(data, set())
@@ -548,7 +554,7 @@ def openapi_document() -> dict:
                                        "goals": {"type": "string", "maxLength": 400},
                                        "response_style": {"type": "string", "maxLength": 160}}},
         "Tool": {"type": "object", "required": ["name", "parameters"], "additionalProperties": False,
-                 "properties": {"name": {"type": "string", "enum": ["system_time", "list_tasks", "create_task", "list_memories", "save_memory", "server_temperatures"]},
+                 "properties": {"name": {"type": "string", "enum": ["system_time", "list_tasks", "create_task", "list_memories", "save_memory", "server_temperatures", "server_hardware"]},
                                 "parameters": {"type": "object"}}},
         "Empty": {"type": "object", "additionalProperties": False},
         "Error": {"type": "object", "required": ["error", "code"],
@@ -556,7 +562,7 @@ def openapi_document() -> dict:
     }
     routes = {
         "/health": {"get": None}, "/state": {"get": None}, "/model": {"get": None},
-        "/temperatures": {"get": None},
+        "/temperatures": {"get": None}, "/hardware": {"get": None},
         "/conversations": {"post": "Message"}, "/history": {"get": None, "delete": None},
         "/threads": {"get": None, "post": "Thread"},
         "/threads/{id}": {"get": None, "patch": "ThreadUpdate", "delete": None},

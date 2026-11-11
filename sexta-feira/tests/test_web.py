@@ -88,6 +88,22 @@ class ServerTests(unittest.TestCase):
         _, schema = self.call("GET", "/api/v1/openapi.json", token=token)
         self.assertIn("/temperatures",schema["paths"])
 
+    def test_owner_hardware_is_authenticated_and_filtered(self):
+        admin="token-de-acesso-para-teste"
+        self.assertEqual(self.call("GET","/api/v1/hardware")[0],401)
+        _,session=self.call("POST","/api/v1/sessions",{"role":"user"},admin)
+        with patch.object(self.server,"metrics",return_value={"cpu_logical":4,"system_cpu_percent":10,"pid":123,"token":"SECRET","requests":100}):
+            status,result=self.call("GET","/api/v1/hardware",token=session["token"])
+            self.assertEqual(status,200)
+            self.assertEqual(result["resources"]["system_cpu_percent"],10)
+            self.assertNotIn("SECRET",json.dumps(result))
+            self.assertNotIn("pid",result["resources"])
+            with patch.object(brain,"generate_reply",side_effect=AssertionError("Operational query must not use model")):
+                status,result=self.call("POST","/api/v1/conversations",{"message":"Como está o servidor?"},session["token"])
+                self.assertEqual(status,200)
+                self.assertEqual(result["tool"],"server_hardware")
+        self.assertEqual(self.call("GET","/api/v1/metrics",token=session["token"])[0],403)
+
     def test_health_requires_authentication(self):
         status, body = self.call("GET", "/api/health")
         self.assertEqual(status, 401)
