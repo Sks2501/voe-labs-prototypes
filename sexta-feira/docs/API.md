@@ -29,7 +29,7 @@ hosts são validados e a API não libera CORS. Para um túnel, configure uma ún
 | `/health` | GET | Disponibilidade autenticada, sem diagnóstico administrativo |
 | `/state` | GET | Histórico recente, memórias, tarefas, preferências e estado do modelo |
 | `/model` | GET | Estado real do motor; não força carregamento dos pesos |
-| `/conversations` | POST | `{ "message": "texto" }`; GPT-2 local ou comando explícito |
+| `/conversations` | POST | `{ "message": "texto", "context_after": 123 }`; modelo local ou comando explícito; corte opcional |
 | `/history` | GET, DELETE | Página de histórico ou exclusão do histórico |
 | `/memories` | GET, POST | Página de memórias; criação com `{ "content": "texto" }` |
 | `/memories/{id}` | PATCH, DELETE | Correção com `content` ou exclusão |
@@ -72,10 +72,18 @@ Somente mensagens do usuário com estes prefixos acionam ferramentas:
 
 A resposta traz `source: tool`, `generated: false` e `action_executed: true` depois
 da execução real. Listas no chat mostram até dez registros; use a lista da interface
-para consultar os demais. Conversas normais trazem `source: gpt2`, `generated: true`
-e `action_executed: false`. Nenhum texto produzido pelo GPT-2 volta a ser analisado
-como comando. O histórico guarda o conteúdo e o papel; a fonte por mensagem ainda
-não é persistida. Não há agendador de notificações nem execução de shell.
+para consultar os demais. Conversas normais trazem `source: local_model` no backend
+llama.cpp (`gpt2` no backend histórico), `generated: true`, `model` e
+`action_executed: false`. Nenhum texto produzido pelo modelo volta a ser analisado
+como comando. A fonte e o nome do modelo são persistidos atomicamente com o par de
+mensagens em metadados SQLite, incluídos no histórico e exportação. Registros antigos
+sem origem permanecem sem atribuição inventada. O esquema continua versão 2.
+
+O campo opcional `context_after` aceita um ID inteiro positivo e restringe somente
+o histórico enviado ao modelo. Não apaga dados. A interface usa isso em Nova conversa;
+recarregar a página restaura o histórico recente. O corte configurado na troca do
+backend mantém o histórico GPT-2 acessível em Ajustes, fora do contexto padrão.
+Não há agendador de notificações nem execução de shell.
 
 ## Limites e proteção dos dados
 

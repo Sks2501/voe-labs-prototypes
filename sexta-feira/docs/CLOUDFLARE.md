@@ -4,6 +4,11 @@ A aplicação escuta em `127.0.0.1:8765` (ou na porta livre escolhida). O hostna
 
 Antes de publicar:
 
+Estado verificado em 11/11/2026: o proprietário reautorizou o site no hostname
+existente; `SextaFeiraTunnel` está ativo. HTTPS, autenticação, origem e conversa real
+passaram nos testes mais recentes. O `Cloudflared` da produção não foi reiniciado.
+Cloudflare Access não foi configurado. Consulte [validação](VALIDATION.md).
+
 1. Inventarie o serviço Cloudflare Tunnel e suas rotas atuais, sem expor tokens ou credenciais. Preserve uma cópia privada da configuração. Descubra se as rotas são locais em YAML ou gerenciadas remotamente no painel.
 2. Verifique API autenticada, origem autorizada, limite de requisição, login/sessões e interface em loopback. Adicione `"public_origin": "https://sexta.teambike.online"` ao `config.json` privado do runtime. `start.ps1` e o runner do serviço leem essa opção sem alterar variáveis globais. A API só aceita essa origem HTTPS exata, além do loopback.
 3. Avalie Cloudflare Access como proteção adicional para o hostname exato, com política de permissão apenas ao proprietário, autenticação forte e sessão limitada. Não use política `Bypass` pública. Se não houver credencial administrativa adequada para configurar Access, registre a pendência: a autenticação própria por Bearer de alta entropia e sessões expirantes continua obrigatória para todos os endpoints da API. A página de login e os arquivos estáticos não contêm dados pessoais. Não declare Access ativo sem testá-lo.

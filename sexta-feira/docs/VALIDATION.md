@@ -2,6 +2,60 @@
 
 ## Atualização de implantação — 11/11/2026
 
+### Estado mais recente: modelo moderno e interface revisada
+
+Após a insatisfação com o GPT-2, o proprietário autorizou fazer o possível sem
+serviços pagos e pediu a correção da interface. A instalação ativa passou para
+Gemma 3 4B IT Q4_K_M via llama.cpp CPU no Dell. O código, licença e pesos OpenAI
+permanecem preservados. Não houve treinamento nem melhoria dos pesos GPT-2.
+
+Pesos e binários foram baixados diretamente no servidor e verificados com os
+hashes fixados em [inferência](INFERENCE.md). A primeira carga de ensaio levou
+4,572 s. As respostas reais passaram a ser inteligíveis em português. No navegador,
+a apresentação com soma retornou `10 + 10 = 20` em 13,9 s; a explicação RAM/SSD
+retornou duas frases coerentes em 14,8 s. São amostras funcionais, não um benchmark
+abrangente de inteligência ou confiabilidade.
+
+Os **58 testes passaram em 9,510 s no destino**, sem ignorados, incluindo cinco
+ensaios reais GPT-2 para preservar compatibilidade e seis testes do novo adaptador,
+contexto, UTF-8, cancelamento e persistência de origem das mensagens. Não houve
+inferência do novo modelo no computador cliente. O cliente apenas transporta JSON.
+
+O verificador HTTPS passou autenticação/401, origem/403, papéis, revogação, memória
+editável, tarefas, comandos explícitos, duas gerações sequenciais e duas simultâneas
+pela fila serial, integridade, backup, exportação e OpenAPI. Duas respostas sequenciais
+levaram 9,589 e 11,052 s; as chamadas em paralelo terminaram em 8,504 e 10,043 s.
+O total API+modelo ficou em cerca de 4,2 GiB de RAM, com cerca de 6,8 GiB disponíveis.
+A CPU agregada observada variou com a janela de medição; durante o ensaio HTTPS,
+a amostra foi 15,44% normalizada pelos quatro processadores lógicos. Disco livre
+aproximadamente 78,6 GiB. Não são limites máximos garantidos.
+
+Os três serviços próprios foram parados e iniciados em ordem controlada. Voltaram
+como LocalService e a saúde autenticada passou. O túnel de produção e os listeners
+Team Bike comparados preservaram os PIDs. Nenhum reboot ou alteração de firewall
+foi executado. Uma falha inicial de quoting do PowerShell 5.1 foi corrigida com
+stdin para o Python; a espera explícita por `Stopped` corrigiu a corrida de reversão.
+Após o reinício, histórico, memória corrigida e tarefa concluída continuaram presentes.
+O verificador removeu apenas seus registros identificados e a integridade final
+retornou `ok`. Os dois registros descartáveis criados pela interface também foram
+removidos, preservando os dados do proprietário.
+
+A interface foi revisada com a skill Sites, mantendo o host existente e o frontend
+HTML/CSS/JS. Login/logout, envio real, fonte persistida após novo login, nova conversa,
+criação/edição de memória, criação/conclusão de tarefa, navegação e ajustes foram
+verificados. O teste móvel 390 px revelou crescimento excessivo da lista de mensagens;
+a altura foi limitada e a rolagem interna corrigida. O compositor permaneceu visível,
+sem overflow horizontal; navegação fixa inferior e versão desktop conferidas. Sem
+erros JavaScript capturados. A sessão de teste foi revogada. Capturas e inventários
+detalhados ficam na entrega privada, fora do repositório.
+
+O proprietário voltou a pedir o site e o túnel exclusivo foi reativado no hostname
+existente. **As seções seguintes são históricas**: o estado API-only já não é atual.
+Cloudflare Access, áudio audível, Whisper, GPU, reboot, recuperação após falha forçada
+e acesso por rede móvel independente continuam não validados. O serviço usa HTTPS
+e autenticação própria obrigatória; nenhum endpoint permite shell. Não há cobrança
+por mensagem nem API comercial, mas a execução consome recursos e energia do host.
+
 ### Alteração posterior: API sem publicação externa
 
 Por orientação posterior do proprietário, o serviço dedicado `SextaFeiraTunnel`

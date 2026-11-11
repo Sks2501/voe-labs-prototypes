@@ -4,6 +4,9 @@ O diagnóstico vale somente para a máquina em que o script é executado. Antes 
 
 ## Instalação
 
+Para o backend Gemma/llama.cpp instalado posteriormente, use [operação do modelo
+moderno](LOCAL_MODEL_WINDOWS.md). As etapas abaixo documentam a base histórica GPT-2.
+
 Ao executar `instalar_windows.bat` por duplo clique, a janela aguarda uma tecla
 ao terminar para que o resultado permaneça visível, inclusive em caso de erro.
 Para automação sem interação, use `scripts/install.ps1` diretamente ou defina

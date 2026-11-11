@@ -1,8 +1,8 @@
-# SEXTA-FEIRA — OpenAI GPT-2 privado
+# SEXTA-FEIRA — assistente privada local
 
-Assistente pessoal experimental, modificável, com inferência local gratuita em CPU. O motor usa os pesos **OpenAI GPT-2 124M originais**, preservados no formato TensorFlow e lidos por um adaptador PyTorch próprio. Não utiliza API comercial, Ollama, Transformers, serviços pagos de inferência ou modelos de outras empresas.
+Assistente pessoal experimental, modificável, com inferência local sem cobrança por mensagem. Após os resultados incoerentes do GPT-2 e a autorização posterior do proprietário para fazer o possível sem pagar, a instalação atual usa **Gemma 3 4B IT Q4_K_M**, executado por **llama.cpp em CPU no Dell**. Não usa API comercial nem Ollama. O navegador é apenas cliente da API; não executa o modelo.
 
-**GPT-2 não é um chatbot moderno.** A geração em português pode ser incoerente, incorreta ou não seguir instruções. Os pesos não foram treinados nem melhorados. Memória, tarefas, autenticação e ferramentas são software determinístico externo ao modelo. Texto gerado não comprova uma ação realizada.
+O código original OpenAI, sua licença, as adaptações e os pesos **GPT-2 124M** continuam preservados para estudo e reversão. O novo modelo é da Google, com quantização de ggml-org e termos próprios; não foi treinado por este projeto. Não é equivalente a um modelo de fronteira como o Astra. Memória, tarefas, autenticação e ferramentas são módulos externos; texto gerado não comprova uma ação executada. Veja [origem e licenças](docs/THIRD_PARTY.md).
 
 ## O que está implementado
 
@@ -10,17 +10,17 @@ Assistente pessoal experimental, modificável, com inferência local gratuita em
 - SQLite próprio com histórico, memórias explícitas editáveis/excluíveis, tarefas, preferências, exportação limitada, backup consistente e verificação de integridade.
 - Interface HTML/CSS/JS escura, responsiva, sem CDN, com estado real do modelo, fila e métricas administrativas. Token somente na memória da página.
 - Voz com sintetizadores locais em português do navegador, quando disponíveis. Microfone desativado; Whisper ainda não instalado nem validado.
-- Carga única sob demanda, uma inferência por vez, fila de duas, uma thread CPU, 512 tokens de entrada, até 64 novos, timeout e reserva preventiva de RAM.
+- Uma instância nativa do modelo, uma inferência por vez, fila de duas, duas threads CPU, contexto total 2048, entrada até 1536 e geração até 192 tokens. Timeout de 90 s e reservas preventivas de RAM; prioridade BelowNormal.
 - Instalador Windows isolado, diagnóstico privado, logs rotativos, preparação de serviço LocalService via WinSW e procedimento de atualização/reversão.
 
-**Estado em 11/11/2026:** API privada local e modelo CPU em execução como serviço LocalService no Windows Server 2022. Por orientação posterior do proprietário, o túnel público exclusivo foi parado e desabilitado; o modo atual dispensa subdomínio. Um cliente REST/SSH permite chamar a API de outro computador sem publicar portas. Os 49 testes do núcleo passaram no destino, incluindo os cinco testes com pesos reais. Consulte o [registro de validação](docs/VALIDATION.md); inventários, credenciais e relatório operacional detalhado ficam fora do Git.
+**Estado em 11/11/2026:** modelo nativo, API e túnel exclusivo em serviços LocalService no Windows Server 2022. O proprietário voltou a solicitar acesso pelo site já existente, e o túnel exclusivo foi reativado. Interface e API em `https://sexta.teambike.online`, autenticadas; os serviços de produção não foram reiniciados. O cliente REST/SSH continua disponível. Consulte o [registro de validação](docs/VALIDATION.md); credenciais e inventários ficam fora do Git.
 
 ## Usar somente a API
 
 No servidor: `http://127.0.0.1:8765/api/v1`, com `Authorization: Bearer <token privado>`.
 Conversa: `POST /conversations`, JSON `{"message":"Olá"}`. A resposta inclui `reply`,
 `source`, `generated` e `action_executed`. Comandos como `/hora` são ferramentas;
-mensagens normais são processadas pelo GPT-2 local.
+mensagens normais são processadas pelo modelo local configurado. A fonte atual é `local_model`; a resposta informa também o modelo.
 
 `scripts/api_client.py` usa somente a biblioteca padrão Python. O arquivo privado
 de configuração indica `token_file`, `base_url` e `transport: "http"`. Exemplo:
@@ -40,6 +40,8 @@ HTTP continua no loopback do servidor; `127.0.0.1` de outro PC não aponta para 
 O modo `request` aceita `--json-file` para corpos; `chat` sem argumento lê stdin.
 
 ## Instalação Windows
+
+Os comandos abaixo preparam a base histórica GPT-2. Para adicionar o backend moderno a um runtime já identificado, siga [operação do modelo moderno](docs/LOCAL_MODEL_WINDOWS.md). Não execute novamente o provisionamento para atualizar uma instalação existente.
 
 Python x64 3.11–3.13, pelo menos 5 GB livres no volume escolhido e margem de RAM para os demais serviços. A instalação não substitui Python global nem serviços da Team Bike. Use diretórios exclusivos; consulte [operação Windows](docs/WINDOWS.md) antes de executar no servidor compartilhado.
 

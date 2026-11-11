@@ -1,9 +1,44 @@
-# Inferência e preservação OpenAI GPT-2
+# Inferência local e preservação OpenAI GPT-2
 
-O motor principal desta versão é o **OpenAI GPT-2 124M original**, em CPU float32.
-Não há API comercial, serviços de inferência externos, Ollama ou modelos de outras
-empresas. Nenhum peso foi treinado, refinado ou melhorado. A personalização em
-português é contexto textual, e não transforma GPT-2 em um modelo de instruções.
+## Backend atual: Gemma 3 4B IT
+
+Depois da autorização posterior do proprietário para uma alternativa gratuita, o
+backend instalado passou a `llama.cpp`. É outro modelo e outra arquitetura, da Google;
+não é uma otimização dos pesos GPT-2. Os arquivos OpenAI abaixo continuam intactos.
+
+`scripts/prepare_local_model.py` baixa e verifica dois artefatos fixados:
+
+| Artefato | Origem fixada | SHA-256 |
+| --- | --- | --- |
+| `gemma-3-4b-it-Q4_K_M.gguf` (2.489.757.856 bytes) | [ggml-org, revisão d0976223747697cb51e056d85c532013931fe52e](https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/tree/d0976223747697cb51e056d85c532013931fe52e) | `882e8d2db44dc554fb0ea5077cb7e4bc49e7342a1f0da57901c0802ea21a0863` |
+| CPU Windows x64 ZIP (25.058.018 bytes) | [llama.cpp b12282](https://github.com/ggml-org/llama.cpp/releases/tag/b12282) | `582a5da726b30e0b9e801b4ebd1b85cbe023ca266bdebf6a9d55426c85e57463` |
+
+O hash do GGUF vem dos metadados LFS da revisão; o ZIP usa o digest do release.
+O recibo local registra também os hashes de cada binário extraído. O serviço verifica
+novamente os arquivos antes de carregar. A execução é offline, CPU apenas, sem
+downloads automáticos, com um slot, duas threads, prioridade BelowNormal, contexto
+2048, entrada 1536, saída 192 e fila externa de duas. A inicialização exige 5 GiB
+livres; novas inferências reservam preventivamente pelo menos 2 GiB. São verificações
+de admissão, não limites rígidos de memória do Windows.
+
+`inference_llama.py` envia mensagens estruturadas ao template nativo, conta tokens
+antes de gerar e remove pares antigos até caber. Mantém até quatro mensagens e três
+memórias pertinentes. Um ID de corte exclui respostas GPT-2 antigas do contexto sem
+apagar o histórico. A credencial nativa é separada da credencial da API. Somente
+HTTP autenticado em `127.0.0.1:18765`, sem proxy ou redirecionamento, é aceito.
+O stream é fechado em cancelamento; timeout de socket limita um prefill travado.
+Comandos explícitos continuam no módulo determinístico; o modelo não executa shell.
+
+Gemma usa [termos próprios](https://ai.google.dev/gemma/terms), diferentes das licenças
+do software. Não redistribuímos pesos neste repositório. Não há fine-tuning nem promessa
+de equivalência a modelos de fronteira. O 355M não foi selecionado: aumentar GPT-2
+não resolveria sua falta de treinamento para conversa em português.
+
+## Backend histórico: OpenAI GPT-2 124M
+
+As seções seguintes descrevem o backend preservado `gpt2`, CPU float32. Nenhum peso
+OpenAI foi treinado, refinado ou melhorado; contexto em português não transforma
+GPT-2 em modelo de instruções.
 
 ## Procedência e execução
 

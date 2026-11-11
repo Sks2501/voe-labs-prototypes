@@ -1,13 +1,16 @@
 # Arquitetura SEXTA-FEIRA
 
-Assistente pessoal experimental em um processo, com um worker de inferência e
-um número limitado de threads HTTP. Não há API comercial de inferência,
-telemetria, execução de shell pelo modelo ou microsserviços obrigatórios.
+Assistente pessoal experimental com API modular em um processo, um worker de
+inferência e threads HTTP limitadas. O backend atual usa um segundo processo nativo
+llama.cpp para manter uma única instância quantizada do Gemma; o serviço supervisor
+garante seu ciclo de vida Windows. Não há API comercial de inferência, telemetria
+ou execução de shell pelo modelo. Não há dependência de infraestrutura distribuída.
 
 | Subsistema | Implementação | Responsabilidade |
 |---|---|---|
 | Core | `cli.py`, `settings.py`, `scripts/service_runner.py` | Inicialização, configuração, encerramento |
-| OpenAI inference | `brain.py`, `inference_torch.py`, `weights.py`, tokenizador original | CPU, checkpoint oficial, fila, limites |
+| Inferência atual | `brain.py`, `inference_llama.py`, `scripts/native_runner.py` | CPU, Gemma GGUF, loopback autenticado, fila, limites |
+| OpenAI preservada | `inference_torch.py`, `weights.py`, tokenizador original | GPT-2, checkpoint original, alternativa histórica |
 | Memory | `storage.py` | SQLite, histórico e memórias explicitamente salvas |
 | Task | `storage.py`, `tools.py` | Tarefas e estado de conclusão |
 | Voice | `web/app.js` | Vozes locais do dispositivo; reconhecimento não ativado |
@@ -21,7 +24,7 @@ telemetria, execução de shell pelo modelo ou microsserviços obrigatórios.
 
 O código TensorFlow histórico da OpenAI permanece em `openai-gpt2/`; uma cópia
 pristine e as diferenças documentadas permitem auditar as modificações.
-O servidor moderno usa um adaptador PyTorch próprio da arquitetura GPT-2. Ele
+O backend histórico usa um adaptador PyTorch próprio da arquitetura GPT-2. Ele
 não executa o grafo TensorFlow original. O leitor de checkpoint suporta apenas
 o formato limitado do checkpoint público e não desserializa pickle nem código.
 
