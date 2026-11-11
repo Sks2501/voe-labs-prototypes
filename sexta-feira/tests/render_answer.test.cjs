@@ -23,4 +23,5 @@ assert(nodes.some(node=>node.className==='answer-list-item'));
 assert(nodes.some(node=>node.className==='answer-heading'));
 const unfinished=context.renderAnswer('```python\nprint("hello")');
 assert(all(unfinished).some(node=>node.tag==='code' && node.textContent==='print("hello")'));
-console.log('Safe answer rendering: 7 assertions passed');
+const localized=context.renderAnswer('```\ntexto\n```');assert(all(localized).some(node=>node.tag==='span' && node.textContent==='Código'));
+console.log('Safe answer rendering: 8 assertions passed');

@@ -1,9 +1,10 @@
-# SEXTA-FEIRA Android 1.0.0
+# SEXTA-FEIRA Android 1.0.1
 
 Cliente Android leve, universal, sem bibliotecas de publicidade/analytics ou motor
 de inferência no telefone. O APK abre o frontend do servidor em um WebView protegido
 e acrescenta síntese local e exportação pelo seletor de arquivos do Android.
-O visual Liquid Glass usa CSS, transparências e reflexos; não incorpora código
+O visual usa cores neutras, controles compactos e transparência discreta. O tema
+acompanha o telefone por padrão, com opções claro/escuro; não incorpora código
 Apple nem reproduz integralmente o app ou as capacidades do ChatGPT.
 
 Requer Android 8.0/API26 ou posterior, WebView atualizado e Internet. A API própria
@@ -74,3 +75,15 @@ Referências: [WebView](https://developer.android.com/develop/ui/views/layout/we
 [segurança WebView](https://developer.android.com/privacy-and-security/risks/cross-app-scripting),
 [apksigner](https://developer.android.com/tools/apksigner),
 [voz local](https://developer.android.com/reference/android/speech/tts/Voice#isNetworkConnectionRequired()).
+
+## Revisão visual 1.0.1
+
+Fundo neutro, controles compactos em cápsulas, compositor de uma linha, ícones SVG
+e menus em folhas modais. Respostas suportam formatação básica e blocos de código
+por DOM, sem inserir HTML do modelo. Fontes permanecem nos detalhes da resposta.
+O build obtém versão/code diretamente do manifesto.
+
+A ponte nativa informa o modo claro/escuro do sistema e aplica a seleção às barras
+do Android. Mudanças de tema não recarregam a página nem encerram a sessão. A versão
+usa a mesma assinatura da 1.0.0 para instalação como atualização. O frontend também
+é compatível com o APK anterior; a sincronização das barras depende da 1.0.1.

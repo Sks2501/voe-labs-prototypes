@@ -2,6 +2,40 @@
 
 ## Atualização de implantação — 11/11/2026
 
+### Revisão 1.0.1 — visual móvel neutro e tema do sistema
+
+Após o feedback sobre o visual, foi usada a [referência móvel oficial](https://chatgpt.com/download/)
+para reorganizar controles compactos, fundo neutro, menus modais e compositor de uma
+linha. Foram removidos os gradientes azul/roxo e a decoração da conversa. A marca
+permanece SEXTA-FEIRA. O usuário escolheu acompanhar o tema do telefone; esse é o
+padrão, com seleção clara/escura opcional. A escolha visual continua apenas local.
+
+O APK 1.0.1/versionCode2 foi compilado e verificado, usando a mesma identidade de
+assinatura da 1.0.0. SHA-256:
+`1466ddba3aa266b90b7555cce4271bf99d48c80f363d0eb054f6e19ccfc5101d`.
+As assinaturas v2/v3, alinhamento e 14 casos de origem passaram. O recibo público
+foi atualizado, e o APK 1.0.0 foi preservado no runtime. O novo bridge informa
+apenas o tema do sistema e ajusta cores/barras; não aumenta permissões.
+
+Quatro testes de regressão de download/manifesto passaram no servidor em 0,336 s.
+O parser de respostas passou oito verificações Node de segurança/formatação, incluindo
+HTML tratado como texto, blocos de código incompletos e rótulo UTF-8. JavaScript passou
+checagem de sintaxe; os 80 IDs HTML são únicos. Não foi repetida inferência de modelo
+ou a suíte Python completa porque esses componentes não mudaram.
+
+No navegador HTTPS, login/logout, nova conversa, menus, comando real `/hora`, tema
+claro, tema do sistema e formatação de código foram conferidos. Em 390×700 e 360×640
+não houve overflow horizontal; o compositor permaneceu dentro do viewport. Uma
+fixture explicitamente sintética foi usada para verificar código/texto literal,
+sem inferência: um bloco de código e zero elementos HTML perigosos na resposta.
+Os registros dessa conversa de QA foram removidos somente após conferir seu conteúdo;
+integridade final `ok`. Sessões de teste foram revogadas, sem erros JavaScript capturados.
+
+Download público HTTPS conferido novamente por versão, tamanho e hash. O modelo
+nativo e os serviços Team Bike foram preservados. Instalação física, mudança real de
+tema no Android e teclado/voz do aparelho continuam pendentes de teste no dispositivo.
+As capturas mostram o frontend responsivo, não uma execução nativa em iPhone.
+
 ### Android e Liquid Glass — revisão posterior
 
 O proprietário pediu APK Android para download e confirmou o visual Liquid Glass.
