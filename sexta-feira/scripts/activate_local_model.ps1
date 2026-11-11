@@ -42,12 +42,15 @@ try{
   if($attempt -eq 29){throw 'Wait for pending conversations before maintenance.'}
   Start-Sleep -Seconds 2
  }
- if($tunnelWasRunning){& (Join-Path $runtime 'service\SextaFeiraTunnel.exe') stop;if($LASTEXITCODE){throw 'Dedicated tunnel stop failed.'}}
+ if($tunnelWasRunning){& (Join-Path $runtime 'service\SextaFeiraTunnel.exe') stop;if($LASTEXITCODE){throw 'Dedicated tunnel stop failed.'};(Get-Service SextaFeiraTunnel).WaitForStatus('Stopped',[TimeSpan]::FromSeconds(60))}
  & (Join-Path $runtime 'service\SextaFeira.exe') stop
  if($LASTEXITCODE){throw 'Application stop failed.'}
+ (Get-Service SextaFeira).WaitForStatus('Stopped',[TimeSpan]::FromSeconds(90))
  $stopped=$true
  foreach($file in $files){$target=Join-Path $project $file;Copy-Item -LiteralPath (Join-Path $source $file) -Destination $target -Force}
- $last=& $config.venv_python -I -B -c 'import sqlite3,sys;c=sqlite3.connect(sys.argv[1]);print(c.execute("SELECT coalesce(max(id),0) FROM messages").fetchone()[0]);c.close()' (Join-Path $config.data_dir 'memory.sqlite3')
+ # stdin avoids Windows PowerShell 5.1 stripping nested quotes in native -c arguments.
+ $lookup='import sqlite3,sys;c=sqlite3.connect(sys.argv[1]);print(c.execute("SELECT coalesce(max(id),0) FROM messages").fetchone()[0]);c.close()'
+ $last=$lookup | & $config.venv_python -I -B - (Join-Path $config.data_dir 'memory.sqlite3')
  if($LASTEXITCODE){throw 'History cutover lookup failed.'}
  $config|Add-Member -NotePropertyName history_after_id -NotePropertyValue ([long]$last) -Force
  $config|Add-Member -NotePropertyName backend -NotePropertyValue 'llama.cpp' -Force
@@ -82,13 +85,17 @@ try{
  & $native start
  if($LASTEXITCODE){throw 'Native service startup failed.'}
  $nativeKey=(Get-Content -LiteralPath $key -Raw).Trim()
+ $nativeReady=$false
  for($attempt=0;$attempt -lt 60;$attempt++){
-  try{$ready=Invoke-RestMethod 'http://127.0.0.1:18765/health' -Headers @{Authorization="Bearer $nativeKey"} -TimeoutSec 2;if($ready.status -eq 'ok'){break}}catch{if($attempt -eq 59){throw 'Native service readiness failed.'}}
+  try{$ready=Invoke-RestMethod 'http://127.0.0.1:18765/health' -Headers @{Authorization="Bearer $nativeKey"} -TimeoutSec 2;if($ready.status -eq 'ok'){$nativeReady=$true;break}}catch{}
   Start-Sleep -Seconds 1
  }
+ if(-not $nativeReady){throw 'Native service readiness failed.'}
  $nativeKey=$null
  & (Join-Path $runtime 'service\SextaFeira.exe') start
  if($LASTEXITCODE){throw 'API startup failed.'}
+ (Get-Service SextaFeira).WaitForStatus('Running',[TimeSpan]::FromSeconds(30))
+ Start-Sleep -Seconds 2
  & (Join-Path $project 'scripts\health.ps1') -RuntimeRoot $runtime
  if($tunnelWasRunning){& (Join-Path $runtime 'service\SextaFeiraTunnel.exe') start;if($LASTEXITCODE){throw 'Dedicated tunnel restart failed.'}}
  $productionAfter=(Get-CimInstance Win32_Service -Filter "Name='Cloudflared'").ProcessId
@@ -100,6 +107,7 @@ try{
   # Restore only the explicit project files/config. Database schema remains 2;
   # never restore its snapshot over conversations written after the backup.
   if((Get-Service SextaFeira).Status -eq 'Running'){& (Join-Path $runtime 'service\SextaFeira.exe') stop}
+  (Get-Service SextaFeira).WaitForStatus('Stopped',[TimeSpan]::FromSeconds(90))
   foreach($file in $files){$saved=Join-Path $backupDirectory $file;if(Test-Path -LiteralPath $saved){Copy-Item -LiteralPath $saved -Destination (Join-Path $project $file) -Force}}
   Copy-Item -LiteralPath (Join-Path $backupDirectory 'config.before.json') -Destination $configPath -Force
   if(Get-Service SextaFeiraInference -ErrorAction SilentlyContinue){Stop-Service SextaFeiraInference -ErrorAction SilentlyContinue;Set-Service SextaFeiraInference -StartupType Disabled -ErrorAction SilentlyContinue}

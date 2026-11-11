@@ -24,7 +24,9 @@ def main():
     base = args.base_url.rstrip("/") + "/api/v1"
     if args.base_url != config.get("public_origin") and args.base_url != f"http://127.0.0.1:{config['port']}":
         raise ValueError("Only the configured local or HTTPS origin may receive credentials")
-    report_file = args.runtime / "diagnostics" / "deployment-check.json"
+    native = config.get("backend") == "llama.cpp"
+    generated_source = "local_model" if native else "gpt2"
+    report_file = args.runtime / "diagnostics" / ("modern-deployment-check.json" if native else "deployment-check.json")
 
     def call(path, body=None, method=None, credential=token, headers=None, expected=200):
         request_headers = {"User-Agent": "SextaFeira-DeploymentVerifier/1.0", "Accept": "application/json"}
@@ -33,7 +35,7 @@ def main():
         data = None
         if body is not None:
             request_headers["Content-Type"] = "application/json"
-            data = json.dumps(body).encode()
+            data = json.dumps(body, ensure_ascii=False).encode("utf-8")
         request_headers.update(headers or {})
         request = urllib.request.Request(base + path, data=data, headers=request_headers, method=method)
         try:
@@ -83,12 +85,12 @@ def main():
             started = time.perf_counter()
             reply = call("/conversations", {"message": "Olá, apresente-se em uma frase."})
             timings.append(round(time.perf_counter() - started, 3))
-            assert reply["source"] == "gpt2" and reply["reply"].strip() and not reply["action_executed"]
+            assert reply["source"] == generated_source and reply["reply"].strip() and not reply["action_executed"]
         report["cold_then_warm_response_seconds"] = timings
         def concurrent_chat(_):
             started = time.perf_counter()
             response = call("/conversations", {"message": "Diga uma frase curta sobre o dia."})
-            assert response["source"] == "gpt2" and response["reply"].strip()
+            assert response["source"] == generated_source and response["reply"].strip()
             return round(time.perf_counter() - started, 3)
         with ThreadPoolExecutor(max_workers=2) as workers:
             report["two_queued_response_seconds"] = list(workers.map(concurrent_chat, range(2)))
@@ -121,7 +123,9 @@ def main():
         report["checks"]["database_integrity_after_cleanup"] = call("/admin/integrity")["integrity"]
         report["stage"] = "complete" if args.stage == "complete" else "complete_restart_check_pending"
     report_file.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(report, ensure_ascii=False))
+    # Explicit UTF-8 also works across Windows PowerShell 5.1 / SSH code pages.
+    import sys
+    sys.stdout.buffer.write((json.dumps(report, ensure_ascii=False) + "\n").encode("utf-8"))
 
 
 if __name__ == "__main__":

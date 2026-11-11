@@ -43,6 +43,7 @@ async function request(path, body, method) {
   return payload;
 }
 function message(role, content, source, model) {
+  $("messages").querySelector(".welcome")?.remove();
   const article = document.createElement("article"); article.className = "message " + (role === "user" ? "user" : "assistant");
   const who = document.createElement("span"); who.className = "who"; who.textContent = role === "user" ? "Você" : "SEXTA-FEIRA";
   const text = document.createElement("span"); text.textContent = content; article.append(who, text);
@@ -81,7 +82,7 @@ function entries(name, items) {
 }
 function collectionControls(name) {
   const total=counts[name],limit=limits[name],shown=collections[name].length;
-  $(name+"-count").textContent=accessToken ? total+" registros · limite "+limit+" · "+shown+" exibidos" : "";
+  $(name+"-count").textContent=accessToken ? total+(total===1 ? " registro" : " registros")+" · limite "+limit+" · "+shown+(shown===1 ? " exibido" : " exibidos") : "";
   $(name+"-more").hidden=!accessToken || shown>=total;
   const input=$(name === "memories" ? "memory" : "task"), form=$(name === "memories" ? "memory-form" : "task-form");
   input.disabled=!accessToken || total>=limit;
