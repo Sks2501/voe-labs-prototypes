@@ -1,4 +1,55 @@
-# Validação executada — 10/11/2026
+# Validação — desenvolvimento e implantação privada
+
+## Atualização de implantação — 11/11/2026
+
+O acesso administrativo por SSH foi estabelecido com chave, fingerprint conferida
+no RDP e restrição ao cliente observado. A auditoria CIM foi executada no destino,
+com inventário privado de serviços, portas e recursos antes da instalação.
+
+Python portátil oficial 3.13.15 e WinSW 2.12.0 foram verificados por tamanho/hash.
+O provisionamento instalou dependências CPU, baixou e verificou os sete arquivos
+oficiais do GPT-2 124M, inicializou SQLite privado e executou inferência real.
+Depois da correção da saída de unittest para stdout no PowerShell 5.1, a instalação
+e o smoke passaram. Os **49 testes, incluindo os cinco testes com pesos reais,
+passaram sem ignorados em 8,271 s** no ensaio adicional do servidor.
+
+Os serviços próprios `SextaFeira` e `SextaFeiraTunnel` estão em execução como
+LocalService, com inicialização automática, logs rotativos e recuperação limitada.
+O serviço da aplicação foi parado/iniciado com sucesso ao aplicar a origem HTTPS,
+antes da criação do serviço de túnel dependente. O túnel de produção não foi
+reiniciado; seus processos e os listeners de produção comparados mantiveram os
+mesmos PIDs. Inventários e medições detalhadas do host não são publicados no Git.
+
+Pelo hostname HTTPS foram verificados: saúde autenticada, bloqueio 401 sem
+credencial/inválida, origem indevida 403, usuário sem acesso administrativo,
+revogação de sessão, memória/correção/exclusão, tarefa/conclusão/exclusão,
+histórico, exportação, backup, integridade SQLite, OpenAPI 3.1 e quatro gerações
+reais. Duas chamadas simultâneas foram atendidas pela fila serializada. O login
+da interface publicada e `/hora` foram testados em navegador; viewport 390×844
+não apresentou overflow horizontal. A sessão de teste foi encerrada e os registros
+de memória/tarefa criados pelo verificador foram removidos. A geração em português
+continuou incoerente: execução correta não equivale à qualidade de um chatbot atual.
+
+Pendências atuais: Cloudflare Access não configurado; proteção externa usa a
+autenticação própria por Bearer e sessões expirantes. O teste adicional de
+persistência após parar/reiniciar os dois serviços já interdependentes foi
+bloqueado pela revisão automática de execução, sem motivo específico informado;
+não foi executado nem marcado como aprovado. Recuperação automática após falha
+forçada e reboot do servidor não foram testados. Não houve reboot. A persistência
+foi conferida por novo cliente e pelos testes de SQLite/backup. O fetch do hostname
+por uma ferramenta web externa falhou; HTTPS e a interface foram validados a partir
+da infraestrutura disponível, sem comprovar um teste por rede móvel independente.
+Voz audível, Whisper, 355M, quantização e GPU continuam não validados.
+
+O código e os serviços estão operacionais, com essas verificações de implantação
+explicitamente pendentes. O relatório completo e as capturas ficam na entrega
+privada local. Nenhum token, banco, peso ou inventário administrativo foi incluído
+nos commits.
+
+## Registro histórico — desenvolvimento de 10/11/2026
+
+As seções abaixo documentam o estado naquele dia. Pendências de acesso e instalação
+desse registro foram superadas pela atualização acima, onde indicado.
 
 ## Escopo e ambiente
 
@@ -70,7 +121,7 @@ o sucesso de inferência comprova execução local e compatibilidade técnica, n
 qualidade de assistente, raciocínio ou confiabilidade factual. As ferramentas
 determinísticas permanecem disponíveis sem carregar o modelo.
 
-## Pendências explícitas
+## Pendências registradas em 10/11/2026 (histórico)
 
 - Auditar o servidor por CIM, confirmar fabricante/virtualização/afinidade/VRAM,
   inventariar todos os serviços/portas e preservar configuração privada do Tunnel.
@@ -91,9 +142,9 @@ determinísticas permanecem disponíveis sem carregar o modelo.
 - Cancelamento REST por desconexão do navegador não foi validado; o motor possui
   cancelamento cooperativo e deadline que inclui a espera na fila.
 
-Os critérios completos de implantação ainda não foram alcançados. O código e a
-instalação de desenvolvimento estão validados; a implantação no servidor continua
-dependendo de acesso administrativo executável e dos testes acima.
+Naquela data, os critérios completos de implantação não tinham sido alcançados.
+O código e a instalação de desenvolvimento estavam validados; a implantação no
+servidor dependia de acesso administrativo executável e dos testes acima.
 
 ## Histórico de engenharia
 

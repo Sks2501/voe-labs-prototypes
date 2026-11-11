@@ -13,7 +13,7 @@ Assistente pessoal experimental, modificável, com inferência local gratuita em
 - Carga única sob demanda, uma inferência por vez, fila de duas, uma thread CPU, 512 tokens de entrada, até 64 novos, timeout e reserva preventiva de RAM.
 - Instalador Windows isolado, diagnóstico privado, logs rotativos, preparação de serviço LocalService via WinSW e procedimento de atualização/reversão.
 
-**Estado da implantação:** testes locais incluem pesos reais e inferência CPU. Serviço Windows Server, WinSW e Cloudflare precisam de execução e validação no destino. A presença dos scripts não significa que foram instalados no servidor.
+**Estado em 11/11/2026:** instalação privada em Windows Server 2022 executada, serviço LocalService via WinSW funcionando e hostname HTTPS com autenticação própria verificado. Os 49 testes passaram no destino, incluindo os cinco testes com pesos reais. Cloudflare Access e a checagem adicional de persistência após um novo reinício completo dos dois serviços continuam pendentes. Consulte o [registro de validação](docs/VALIDATION.md); inventários, credenciais e relatório operacional detalhado ficam fora do Git.
 
 ## Instalação Windows
 
@@ -26,6 +26,8 @@ Python x64 3.11–3.13, pelo menos 5 GB livres no volume escolhido e margem de R
 ```
 
 O caminho Python é exemplo: use um interpretador x64 realmente instalado e acessível à conta de serviço. Os scripts recusam uma porta ocupada e não encerram seu proprietário. Os wrappers `.bat` são atalhos para os mesmos scripts.
+
+Como alternativa sem instalar Python global, `scripts/provision.ps1 -RuntimeRoot 'C:\SextaFeiraRuntime' -InstallService` prepara Python 3.13.15 portátil oficial, com tamanho/hash fixados, instala e testa o sistema, verifica WinSW 2.12.0 e ativa somente o serviço próprio. Requer execução administrativa para registrar o serviço; a operação diária usa LocalService. Não publica o hostname automaticamente. `-PrepareOnly` verifica apenas o Python portátil.
 
 O instalador baixa PyTorch do índice CPU oficial, aplica versões de `requirements.txt` e `constraints.txt`, baixa os sete arquivos da origem oficial OpenAI e verifica seus hashes. Banco, modelos, token, logs e relatórios ficam no runtime privado, fora do Git. A execução normal nunca baixa modelos.
 
@@ -46,7 +48,7 @@ python scripts\smoke.py
 python -m sexta_feira serve --token-file 'CAMINHO_PRIVADO\access.token'
 ```
 
-Sem `SEXTA_RUN_MODEL_TESTS=1`, os quatro testes do checkpoint real são ignorados explicitamente. O smoke utiliza banco temporário e não altera conversas existentes. Os resultados locais estão em [validação](docs/VALIDATION.md) e [benchmark](docs/benchmark-local.json). Os tempos do computador de desenvolvimento não são medições do Dell/Windows Server.
+Sem `SEXTA_RUN_MODEL_TESTS=1`, os cinco testes do checkpoint real são ignorados explicitamente. Para registrar saída em Windows PowerShell 5.1, use `python scripts\run_tests.py`, que envia o progresso normal para stdout. O smoke utiliza banco temporário e não altera conversas existentes. Os resultados locais estão em [validação](docs/VALIDATION.md) e [benchmark](docs/benchmark-local.json). Os tempos do computador de desenvolvimento não são medições do servidor.
 
 ## Rede, segurança e manutenção
 
