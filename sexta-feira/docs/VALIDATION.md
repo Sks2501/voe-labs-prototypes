@@ -2,6 +2,23 @@
 
 ## Atualização de implantação — 11/11/2026
 
+### Alteração posterior: API sem publicação externa
+
+Por orientação posterior do proprietário, o serviço dedicado `SextaFeiraTunnel`
+foi parado e desabilitado. `SextaFeira` e o `Cloudflared` de produção permaneceram
+em execução. Não foi criado outro hostname, rota, serviço ou abertura de firewall.
+O registro DNS anterior foi preservado, mas o túnel exclusivo não publica mais a
+aplicação. Os testes HTTPS abaixo são históricos, anteriores a essa alteração.
+
+O cliente `scripts/api_client.py` foi instalado e testado: saúde autenticada por
+HTTP loopback no servidor; saúde, `/hora` e uma geração real GPT-2 a partir do
+computador cliente via SSH, todos HTTP 200. JSON UTF-8 e credenciais são enviados
+por stdin criptografado, com chave/fingerprint já configurados, sem usar subdomínio
+ou ativar encaminhamento de portas. A resposta portuguesa do modelo continuou
+incoerente; isso não foi apresentado como melhoria dos pesos ou qualidade.
+
+### Implantação e ensaios anteriores no mesmo dia
+
 O acesso administrativo por SSH foi estabelecido com chave, fingerprint conferida
 no RDP e restrição ao cliente observado. A auditoria CIM foi executada no destino,
 com inventário privado de serviços, portas e recursos antes da instalação.

@@ -13,7 +13,31 @@ Assistente pessoal experimental, modificável, com inferência local gratuita em
 - Carga única sob demanda, uma inferência por vez, fila de duas, uma thread CPU, 512 tokens de entrada, até 64 novos, timeout e reserva preventiva de RAM.
 - Instalador Windows isolado, diagnóstico privado, logs rotativos, preparação de serviço LocalService via WinSW e procedimento de atualização/reversão.
 
-**Estado em 11/11/2026:** instalação privada em Windows Server 2022 executada, serviço LocalService via WinSW funcionando e hostname HTTPS com autenticação própria verificado. Os 49 testes passaram no destino, incluindo os cinco testes com pesos reais. Cloudflare Access e a checagem adicional de persistência após um novo reinício completo dos dois serviços continuam pendentes. Consulte o [registro de validação](docs/VALIDATION.md); inventários, credenciais e relatório operacional detalhado ficam fora do Git.
+**Estado em 11/11/2026:** API privada local e modelo CPU em execução como serviço LocalService no Windows Server 2022. Por orientação posterior do proprietário, o túnel público exclusivo foi parado e desabilitado; o modo atual dispensa subdomínio. Um cliente REST/SSH permite chamar a API de outro computador sem publicar portas. Os 49 testes do núcleo passaram no destino, incluindo os cinco testes com pesos reais. Consulte o [registro de validação](docs/VALIDATION.md); inventários, credenciais e relatório operacional detalhado ficam fora do Git.
+
+## Usar somente a API
+
+No servidor: `http://127.0.0.1:8765/api/v1`, com `Authorization: Bearer <token privado>`.
+Conversa: `POST /conversations`, JSON `{"message":"Olá"}`. A resposta inclui `reply`,
+`source`, `generated` e `action_executed`. Comandos como `/hora` são ferramentas;
+mensagens normais são processadas pelo GPT-2 local.
+
+`scripts/api_client.py` usa somente a biblioteca padrão Python. O arquivo privado
+de configuração indica `token_file`, `base_url` e `transport: "http"`. Exemplo:
+
+```powershell
+python scripts\api_client.py --config 'CAMINHO_PRIVADO\api-client.json' health
+python scripts\api_client.py --config 'CAMINHO_PRIVADO\api-client.json' chat '/hora'
+python scripts\api_client.py --config 'CAMINHO_PRIVADO\api-client.json' request GET tasks
+```
+
+Para outro computador com SSH já autorizado, o transporte `ssh` recebe no JSON
+privado os campos `ssh_host`, `ssh_key`, `known_hosts`, `remote_python` e
+`remote_client`. O fingerprint precisa estar previamente verificado. O cliente
+executa somente o comando fixo do cliente remoto e envia token/corpo por stdin
+criptografado, sem credenciais nos argumentos, port forwarding ou DNS. O serviço
+HTTP continua no loopback do servidor; `127.0.0.1` de outro PC não aponta para ele.
+O modo `request` aceita `--json-file` para corpos; `chat` sem argumento lê stdin.
 
 ## Instalação Windows
 
