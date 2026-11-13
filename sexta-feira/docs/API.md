@@ -1,5 +1,7 @@
 # API privada v1
 
+Pesquisa pessoal: `POST /api/v1/research` com apenas `query` (2–320 caracteres) ou `url` (HTTPS público), autenticado. A ferramenta `web_research` aceita os mesmos parâmetros; no chat use `/pesquisar assunto`, `/site URL` ou `research:true`. Fontes e data acompanham o resultado; o modelo de síntese permanece local. Veja [WEB_RESEARCH.md](WEB_RESEARCH.md) para escopo pessoal do RSS, limites e privacidade.
+
 A aplicação atende **um único proprietário**. Sessões de usuário e administrador
 compartilham os dados pessoais desse proprietário; não é um serviço multitenant.
 O processo escuta em `127.0.0.1:8765`. Publicação requer HTTPS e controle de acesso

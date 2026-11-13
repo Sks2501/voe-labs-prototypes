@@ -104,6 +104,22 @@ class ServerTests(unittest.TestCase):
                 self.assertEqual(result["tool"],"server_hardware")
         self.assertEqual(self.call("GET","/api/v1/metrics",token=session["token"])[0],403)
 
+    def test_research_is_authenticated_explicit_and_preserves_source_links(self):
+        admin="token-de-acesso-para-teste"
+        self.assertEqual(self.call("POST","/api/v1/research",{"query":"topic"})[0],401)
+        result={"reply":"Found sources:\nhttps://example.com/article","source":"tool","generated":False,"action_executed":True,"tool":"web_research"}
+        with patch.object(self.server.research,"run",return_value=result) as web,patch.object(brain,"generate_reply",return_value="local answer") as model:
+            status,_=self.call("POST","/api/v1/conversations",{"message":"Olá"},admin)
+            self.assertEqual(status,200);web.assert_not_called();model.assert_called_once()
+            status,answer=self.call("POST","/api/v1/conversations",{"message":"pesquise topic"},admin)
+            self.assertEqual(status,200);self.assertEqual(answer['tool'],'web_research');web.assert_called_with(query='topic')
+            self.assertIn('https://example.com/article',self.server.storage.history()[-1]['content'])
+            self.call("POST","/api/v1/conversations",{"message":"topic","research":True},admin)
+            web.assert_called_with(query='topic')
+            self.assertEqual(self.call("POST","/api/v1/conversations",{"message":"topic","research":"yes"},admin)[0],400)
+        status,schema=self.call('GET','/api/v1/openapi.json',token=admin)
+        self.assertIn('/research',schema['paths'])
+
     def test_health_requires_authentication(self):
         status, body = self.call("GET", "/api/health")
         self.assertEqual(status, 401)

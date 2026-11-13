@@ -4,11 +4,18 @@ from datetime import datetime
 from .storage import cleaned
 from .temperatures import is_temperature_request, read_temperatures, temperature_reply
 from .hardware import is_hardware_request, hardware_reply
+from .web_research import research_request, ResearchUnavailable
 
 
-def execute_tool(name: str, parameters: dict, storage, *, temperature_file=None, hardware_reader=None) -> dict:
+def execute_tool(name: str, parameters: dict, storage, *, temperature_file=None, hardware_reader=None, research_reader=None) -> dict:
     if not isinstance(parameters, dict):
         raise ValueError("parameters deve ser objeto.")
+    if name == "web_research":
+        if set(parameters) not in ({"query"},{"url"}):
+            raise ValueError("Informe apenas query ou url.")
+        if not research_reader:
+            raise ResearchUnavailable("Pesquisa não configurada.")
+        return research_reader(**parameters)
     if name == "server_hardware":
         if parameters:
             raise ValueError("server_hardware não aceita parâmetros.")
@@ -34,11 +41,14 @@ def execute_tool(name: str, parameters: dict, storage, *, temperature_file=None,
     raise ValueError("Ferramenta inexistente ou não autorizada.")
 
 
-def execute_chat_command(message: str, storage, *, temperature_file=None, hardware_reader=None) -> dict | None:
+def execute_chat_command(message: str, storage, *, temperature_file=None, hardware_reader=None, research_reader=None) -> dict | None:
     """Explicit commands or a narrow read-only temperature request select tools.
 
     The caller must never pass generated model output to this function.
     """
+    request = research_request(message)
+    if request is not None:
+        return execute_tool("web_research",request,storage,research_reader=research_reader)
     if not message.startswith("/"):
         if is_temperature_request(message):
             message = "/temperaturas"

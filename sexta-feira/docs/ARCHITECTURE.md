@@ -1,5 +1,7 @@
 # Arquitetura SEXTA-FEIRA
 
+Pesquisa pessoal na web é um módulo separado de leitura: `web_research.py`. Somente pedidos explícitos ou o botão de pesquisa enviam a consulta atual ao leitor RSS; histórico e perfil permanecem locais. Páginas públicas são lidas com limites de rede e proteção contra destinos internos; a síntese usa a mesma fila/modelo já existente. Nenhum texto de site ou do modelo é interpretado como comando. Veja [WEB_RESEARCH.md](WEB_RESEARCH.md) e [MAINTENANCE.md](MAINTENANCE.md).
+
 Assistente pessoal experimental com API modular em um processo, um worker de
 inferência e threads HTTP limitadas. O backend atual usa um segundo processo nativo
 llama.cpp para manter uma única instância quantizada do Gemma; o serviço supervisor

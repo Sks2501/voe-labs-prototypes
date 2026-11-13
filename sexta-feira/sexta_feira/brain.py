@@ -1,4 +1,4 @@
-"""Bounded single-worker CPU inference; no downloads or remote calls at runtime."""
+"""Bounded single-worker CPU inference; no hosted inference or runtime model downloads."""
 from __future__ import annotations
 from dataclasses import dataclass, field
 import ctypes
@@ -263,6 +263,14 @@ def generate_reply(message: str, history: list[dict], memories: list[dict], mode
 
 def generated_source():
     return "local_model" if os.environ.get("SEXTA_BACKEND", "gpt2") == "llama.cpp" else "gpt2"
+
+
+def generate_researched_reply(question: str, sources: list[dict], model_size: str = DEFAULT_MODEL) -> str:
+    engine = _get_engine()
+    if getattr(engine, "backend", None) != "llama.cpp":
+        raise InferenceUnavailable("Web synthesis requires the existing local chat backend")
+    return engine.submit(engine.build_research_messages(question, sources),model_size,
+                         timeout=min(75,engine._timeout))
 
 
 def engine_status():

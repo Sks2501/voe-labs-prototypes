@@ -24,6 +24,7 @@ from .storage import Storage, CapacityError, ExportTooLarge, cleaned, identifier
 from .tools import execute_tool, execute_chat_command
 from .temperatures import read_temperatures
 from .hardware import hardware_snapshot
+from .web_research import ResearchEngine
 from .observability import configure_logging, resource_snapshot, native_resource_snapshot
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -55,6 +56,7 @@ class AssistantServer(ThreadingHTTPServer):
         if model_size not in MODELS:
             raise ValueError("Modelo inválido.")
         self.storage = storage
+        self.research = ResearchEngine(summarizer=lambda question,sources: brain.generate_researched_reply(question,sources,model_size))
         configured_sensor = os.environ.get("SEXTA_TEMPERATURE_FILE")
         self.temperature_file = temperature_file or (Path(configured_sensor) if configured_sensor else None)
         self.auth = Authentication(storage, token, os.environ.get("SEXTA_USER_TOKEN"))
@@ -337,7 +339,11 @@ class AssistantHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             failed = True
             name = type(exc).__name__
-            if name == "InferenceBusy":
+            if name == "ResearchBusy":
+                self._json(429, {"error":"Uma pesquisa já está em andamento ou foi feita há poucos segundos. Aguarde.","code":"research_busy"})
+            elif name == "ResearchUnavailable":
+                self._json(503, {"error":"A pesquisa não disponibilizou fontes acessíveis agora. Tente mais tarde ou envie um site HTTPS público.","code":"research_unavailable"})
+            elif name == "InferenceBusy":
                 self._json(429, {"error": "Fila de inferência cheia.", "code": "inference_busy"})
             elif name == "InferenceTimeout":
                 self._json(504, {"error": "Tempo limite de inferência atingido.", "code": "inference_timeout"})
@@ -430,13 +436,17 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._fields(data, {"title"}, {"title"})
             self._json(200, db.rename_thread(path.rsplit("/", 1)[1], data["title"]))
         elif path in ("/api/v1/conversations", "/api/v1/chat") and self.command == "POST":
-            self._fields(data, {"message", "context_after", "thread_id"}, {"message"})
+            self._fields(data, {"message", "context_after", "thread_id", "research"}, {"message"})
+            if "research" in data and type(data["research"]) is not bool:
+                raise ValueError("research deve ser booleano.")
             message = cleaned(data["message"], 1600)
             context_after = identifier(data["context_after"]) if "context_after" in data else None
             thread_id = data.get("thread_id")
             if "thread_id" in data:
                 db.thread(thread_id)
-            result = execute_chat_command(message, db, temperature_file=self.server.temperature_file, hardware_reader=self.server.hardware)
+            result = execute_chat_command(message, db, temperature_file=self.server.temperature_file, hardware_reader=self.server.hardware, research_reader=self.server.research.run)
+            if result is None and data.get("research"):
+                result = self.server.research.run(query=message)
             if result is None:
                 history = db.thread_history(thread_id, 8) if thread_id is not None else db.history(8)
                 if context_after is not None:
@@ -464,7 +474,10 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._json(200, db.set_preferences(data))
         elif path == "/api/v1/tools" and self.command == "POST":
             self._fields(data, {"name", "parameters"}, {"name", "parameters"})
-            self._json(200, execute_tool(data["name"], data["parameters"], db, temperature_file=self.server.temperature_file, hardware_reader=self.server.hardware))
+            self._json(200, execute_tool(data["name"], data["parameters"], db, temperature_file=self.server.temperature_file, hardware_reader=self.server.hardware, research_reader=self.server.research.run))
+        elif path == "/api/v1/research" and self.command == "POST":
+            self._fields(data, {"query","url"})
+            self._json(200, self.server.research.run(**data))
         elif path == "/api/v1/admin/backup" and self.command == "POST":
             self._admin(principal)
             self._fields(data, set())
@@ -532,6 +545,7 @@ def openapi_document() -> dict:
     schemas = {
         "Message": {"type": "object", "required": ["message"], "additionalProperties": False,
                     "properties": {"message": {"type": "string", "minLength": 1, "maxLength": 1600},
+                                   "research": {"type":"boolean","default":False},
                                    "context_after": {"type": "integer", "minimum": 1},
                                    "thread_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"}}},
         "Thread": {"type": "object", "additionalProperties": False,
@@ -554,15 +568,20 @@ def openapi_document() -> dict:
                                        "goals": {"type": "string", "maxLength": 400},
                                        "response_style": {"type": "string", "maxLength": 160}}},
         "Tool": {"type": "object", "required": ["name", "parameters"], "additionalProperties": False,
-                 "properties": {"name": {"type": "string", "enum": ["system_time", "list_tasks", "create_task", "list_memories", "save_memory", "server_temperatures", "server_hardware"]},
+                 "properties": {"name": {"type": "string", "enum": ["system_time", "list_tasks", "create_task", "list_memories", "save_memory", "server_temperatures", "server_hardware", "web_research"]},
                                 "parameters": {"type": "object"}}},
         "Empty": {"type": "object", "additionalProperties": False},
+        "Research": {"type":"object","additionalProperties":False,
+                     "properties":{"query":{"type":"string","minLength":2,"maxLength":320},
+                                   "url":{"type":"string","format":"uri","maxLength":1600}},
+                     "oneOf":[{"required":["query"]},{"required":["url"]}]},
         "Error": {"type": "object", "required": ["error", "code"],
                   "properties": {"error": {"type": "string"}, "code": {"type": "string"}}},
     }
     routes = {
         "/health": {"get": None}, "/state": {"get": None}, "/model": {"get": None},
         "/temperatures": {"get": None}, "/hardware": {"get": None},
+        "/research": {"post":"Research"},
         "/conversations": {"post": "Message"}, "/history": {"get": None, "delete": None},
         "/threads": {"get": None, "post": "Thread"},
         "/threads/{id}": {"get": None, "patch": "ThreadUpdate", "delete": None},
