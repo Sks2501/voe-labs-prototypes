@@ -1,4 +1,4 @@
-# SEXTA-FEIRA Android 1.0.1
+# SEXTA-FEIRA Android 1.0.2
 
 Cliente Android leve, universal, sem bibliotecas de publicidade/analytics ou motor
 de inferência no telefone. O APK abre o frontend do servidor em um WebView protegido
@@ -29,7 +29,7 @@ a identidade e faça backup privado autorizado: atualizações precisam da mesma
 Não publique a chave, arquivo DPAPI ou senha. Uma identidade parcial existente não
 é substituída. A senha chega ao assinador apenas pelo ambiente transitório do processo.
 
-O build usa aapt2, javac, D8, zipalign e apksigner. Executa 14 verificações da política
+O build usa aapt2, javac, D8, zipalign e apksigner. Executa 38 verificações da política
 de origem, verifica a assinatura e extrai os metadados do pacote. O recibo registra
 versão, tamanho, hash e certificado público. Não substitui um APK existente diferente
 no mesmo diretório: use um diretório de candidato e incremente a versão ao publicar
@@ -40,7 +40,13 @@ uma atualização. O projeto não contém binários do SDK ou dependências baix
 - Somente permissão INTERNET; sem câmera, microfone, contatos ou armazenamento amplo.
 - HTTPS obrigatório, certificado válido e host exato `sexta.teambike.online`. Sem
   arquivos/content URIs dentro do WebView, mixed content, terceiros ou depuração.
-- O bridge `SextaAndroid` tem somente voz local, parar voz e solicitar exportação JSON.
+- Fontes de pesquisa abrem no navegador externo somente após toque em link HTTPS,
+  em navegação GET do quadro principal. Formulários, subframes, navegações automáticas,
+  credenciais na URL, portas alternativas e endereços locais/literais são recusados.
+  A sessão autenticada permanece no WebView; o Intent contém somente a URL, sem
+  token, cabeçalhos ou credenciais da SEXTA-FEIRA.
+- O bridge `SextaAndroid` oferece voz local, parar voz, exportação JSON, consulta ao
+  tema do sistema e aplicação de cores da interface.
   Não expõe tokens, shell, rede arbitrária ou leitura de arquivos. Conteúdo de terceiros
   é bloqueado; o servidor aplica CSP que impede frames e renderiza conversas como texto.
 - TTS escolhe voz portuguesa com `isNetworkConnectionRequired=false`. Sem voz local
@@ -75,6 +81,27 @@ Referências: [WebView](https://developer.android.com/develop/ui/views/layout/we
 [segurança WebView](https://developer.android.com/privacy-and-security/risks/cross-app-scripting),
 [apksigner](https://developer.android.com/tools/apksigner),
 [voz local](https://developer.android.com/reference/android/speech/tts/Voice#isNetworkConnectionRequired()).
+
+## Pesquisa web — 1.0.2
+
+O frontend consulta a API no servidor para pesquisar ou ler páginas públicas. O
+modelo continua no servidor, sem inferência no telefone. A versão 1.0.2 permite
+abrir os links das fontes no navegador do aparelho, separado da interface com o
+bridge nativo. URLs externas não são carregadas no WebView autenticado. A política
+nativa verifica a sintaxe da URL; a resolução DNS e a proteção do leitor de sites
+contra acesso a redes internas são verificadas separadamente pelo servidor.
+
+As 38 verificações Java cobrem origem exata, esquemas, portas, credenciais, nomes
+locais, ponto final em nomes, formas numéricas alternativas, chaves sensíveis na
+query e a combinação quadro principal/gesto/GET. A compilação, alinhamento e
+assinaturas v2/v3 foram conferidos. O APK usa a mesma identidade das versões
+anteriores e não amplia as permissões Android.
+
+No APK 1.0.1, a interface pode mostrar as novas respostas e seus URLs, mas a abertura
+de sites externos permanece bloqueada. Instale 1.0.2 para usar os links no navegador.
+A abertura real de fontes, retorno do navegador e ciclo de vida em um telefone
+físico ainda precisam de teste no aparelho; os testes Java e o build não substituem
+essa validação.
 
 ## Revisão visual 1.0.1
 

@@ -101,7 +101,7 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(false);settings.setSupportMultipleWindows(false);
         settings.setMediaPlaybackRequiresUserGesture(true);settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setSafeBrowsingEnabled(true);
-        settings.setUserAgentString(settings.getUserAgentString()+" SextaFeiraAndroid/1.0.1");
+        settings.setUserAgentString(settings.getUserAgentString()+" SextaFeiraAndroid/1.0.2");
         if(Build.VERSION.SDK_INT>=29)settings.setForceDark(WebSettings.FORCE_DARK_OFF);
         if(Build.VERSION.SDK_INT>=33)settings.setAlgorithmicDarkeningAllowed(false);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
@@ -119,6 +119,10 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (OriginPolicy.isTrusted(request.getUrl().toString())) return false;
+                if(OriginPolicy.shouldOpenExternal(request.getUrl().toString(),request.getMethod(),request.isForMainFrame(),request.hasGesture())){
+                    try{startActivity(new Intent(Intent.ACTION_VIEW,request.getUrl()).addCategory(Intent.CATEGORY_BROWSABLE));}
+                    catch(Exception ignored){toast("Não há navegador disponível para abrir esta fonte.");}
+                }
                 // Keep all other origins/schemes outside the authenticated WebView.
                 return true;
             }

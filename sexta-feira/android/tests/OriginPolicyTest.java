@@ -8,6 +8,18 @@ public final class OriginPolicyTest {
             "file:///data/data/secret","content://private","javascript:alert(1)","about:blank","https://sexta.teambike.online@evil.invalid/"};
         for(String url:allowed)if(!OriginPolicy.isTrusted(url))throw new AssertionError("Trusted URL rejected");
         for(String url:blocked)if(OriginPolicy.isTrusted(url))throw new AssertionError("Untrusted URL accepted");
-        System.out.println("Origin policy: "+(allowed.length+blocked.length)+" checks passed");
+        String[] sources={"https://docs.python.org/3/","https://www.gov.br/","https://example.com:443/article"};
+        String[] badSources={OriginPolicy.HOME,"http://example.com/","javascript:alert(1)","https://127.0.0.1/","https://192.168.0.1/","https://machine.local/","https://user@example.com/","https://example.com:444/",
+            "https://machine.local./","https://machine.internal./","https://example.com./","https://0x7f.0.0.1/","https://0177.0.0.1/",
+            "https://example.com/?token=secret","https://example.com/?ACCESS_TOKEN=secret","https://example.com/?%74oken=secret"};
+        for(String url:sources)if(!OriginPolicy.isExternalSource(url))throw new AssertionError("Source URL rejected");
+        for(String url:badSources)if(OriginPolicy.isExternalSource(url))throw new AssertionError("Unsafe source URL accepted");
+        String external="https://docs.python.org/3/";
+        if(!OriginPolicy.shouldOpenExternal(external,"GET",true,true))throw new AssertionError("Explicit source click rejected");
+        if(OriginPolicy.shouldOpenExternal(external,"GET",true,false))throw new AssertionError("Automatic navigation accepted");
+        if(OriginPolicy.shouldOpenExternal(external,"GET",false,true))throw new AssertionError("Subframe navigation accepted");
+        if(OriginPolicy.shouldOpenExternal(external,"POST",true,true))throw new AssertionError("Form submission accepted");
+        if(OriginPolicy.shouldOpenExternal(OriginPolicy.HOME,"GET",true,true))throw new AssertionError("Trusted origin left WebView");
+        System.out.println("Origin policy: "+(allowed.length+blocked.length+sources.length+badSources.length+5)+" checks passed");
     }
 }

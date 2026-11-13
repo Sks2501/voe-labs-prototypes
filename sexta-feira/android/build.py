@@ -71,7 +71,7 @@ def main():
     if not final.exists():shutil.copyfile(apk,final)
     receipt={'version':version,'version_code':version_code,'package':'online.teambike.sextafeira','min_android':'8.0','min_sdk':26,
         'target_sdk':35,'bytes':final.stat().st_size,'sha256':digest,'filename':final.name,
-        'api_origin':'https://sexta.teambike.online','native_origin_checks':14,'sdk_build_tools':'35.0.0','certificate_sha256':certificate}
+        'api_origin':'https://sexta.teambike.online','native_origin_checks':38,'sdk_build_tools':'35.0.0','certificate_sha256':certificate}
     (output/'android-release.json').write_text(json.dumps(receipt,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(receipt))
 
