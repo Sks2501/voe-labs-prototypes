@@ -95,6 +95,6 @@ Fonte histórica: [openai/gpt-2](https://github.com/openai/gpt-2). O código ori
 SEXTA-FEIRA é uma personalização independente; não é produto oficial da OpenAI nem equivalente ao ChatGPT. Preserve atribuições e identifique os textos gerados.
 # Pesquisa pessoal e manutenção
 
-Use **+ → Pesquisar na web**, `/pesquisar assunto` ou `/site https://site-publico/`. A resposta informa fontes e data; a síntese permanece no modelo local. Não há garantia de correção factual ou cobertura de todos os sites. [Como funciona e limites](docs/WEB_RESEARCH.md).
+Faça sua pergunta normalmente. O modo automático pesquisa assuntos públicos atuais. Para pedir uma busca específica, escreva “pesquise sobre…” ou “leia este site: https://site-publico/”. A barra no compositor abre o menu de atalhos. A resposta informa fontes e data; a síntese permanece no modelo local. Não há garantia de correção factual ou cobertura de todos os sites. [Como funciona e limites](docs/WEB_RESEARCH.md).
 
 O servidor tem um [procedimento de organização reversível](docs/MAINTENANCE.md) para instaladores próprios antigos e um índice privado de operação. Não reorganiza pastas de produção automaticamente.

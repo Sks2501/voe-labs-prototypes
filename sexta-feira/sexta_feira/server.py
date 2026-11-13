@@ -436,15 +436,15 @@ class AssistantHandler(BaseHTTPRequestHandler):
             self._fields(data, {"title"}, {"title"})
             self._json(200, db.rename_thread(path.rsplit("/", 1)[1], data["title"]))
         elif path in ("/api/v1/conversations", "/api/v1/chat") and self.command == "POST":
-            self._fields(data, {"message", "context_after", "thread_id", "research"}, {"message"})
-            if "research" in data and type(data["research"]) is not bool:
+            self._fields(data, {"message", "context_after", "thread_id", "research", "auto_research"}, {"message"})
+            if any(type(data[key]) is not bool for key in ("research", "auto_research") if key in data):
                 raise ValueError("research deve ser booleano.")
             message = cleaned(data["message"], 1600)
             context_after = identifier(data["context_after"]) if "context_after" in data else None
             thread_id = data.get("thread_id")
             if "thread_id" in data:
                 db.thread(thread_id)
-            result = execute_chat_command(message, db, temperature_file=self.server.temperature_file, hardware_reader=self.server.hardware, research_reader=self.server.research.run)
+            result = execute_chat_command(message, db, temperature_file=self.server.temperature_file, hardware_reader=self.server.hardware, research_reader=self.server.research.run, auto_research=data.get("auto_research", True))
             if result is None and data.get("research"):
                 result = self.server.research.run(query=message)
             if result is None:
@@ -545,7 +545,7 @@ def openapi_document() -> dict:
     schemas = {
         "Message": {"type": "object", "required": ["message"], "additionalProperties": False,
                     "properties": {"message": {"type": "string", "minLength": 1, "maxLength": 1600},
-                                   "research": {"type":"boolean","default":False},
+                                   "research": {"type":"boolean","default":False}, "auto_research": {"type":"boolean","default":True},
                                    "context_after": {"type": "integer", "minimum": 1},
                                    "thread_id": {"type": "string", "pattern": "^[a-f0-9]{32}$"}}},
         "Thread": {"type": "object", "additionalProperties": False,

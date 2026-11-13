@@ -12,6 +12,10 @@ const document={createElement:tag=>new Element(tag),createTextNode:text=>({tag:'
 const source=fs.readFileSync(path.join(__dirname,'../sexta_feira/web/app.js'),'utf8');
 const context=vm.createContext({document,URL});
 vm.runInContext(source.slice(source.indexOf('function appendInline('),source.indexOf('function message(')),context);
+vm.runInContext(source.slice(source.indexOf('function researchFlags('),source.indexOf('function appendInline(')),context);
+assert.equal(JSON.stringify(context.researchFlags('auto')),JSON.stringify({research:false,auto_research:true}));
+assert.equal(JSON.stringify(context.researchFlags('on')),JSON.stringify({research:true,auto_research:false}));
+assert.equal(JSON.stringify(context.researchFlags('off')),JSON.stringify({research:false,auto_research:false}));
 const unsafe='<img src=x onerror=alert(1)> **<svg onload=alert(2)>** `literal`\n```html\n<script>alert(3)</script>\n```\n- item\n### Heading';
 const rendered=context.renderAnswer(unsafe);
 function all(node){return [node,...node.children.flatMap(all)];}
@@ -26,4 +30,4 @@ assert(all(unfinished).some(node=>node.tag==='code' && node.textContent==='print
 const localized=context.renderAnswer('```\ntexto\n```');assert(all(localized).some(node=>node.tag==='span' && node.textContent==='Código'));
 const links=all(context.renderAnswer('Fonte: https://docs.python.org/3/library/sqlite3.html. javascript:alert(1) https://user:password@example.com/'));
 const anchors=links.filter(node=>node.tag==='a');assert.equal(anchors.length,1);assert.equal(anchors[0].href,'https://docs.python.org/3/library/sqlite3.html');assert.equal(anchors[0].rel,'noopener noreferrer');
-console.log('Safe answer rendering: 11 assertions passed');
+console.log('Safe answer rendering and research opt-out: 14 assertions passed');

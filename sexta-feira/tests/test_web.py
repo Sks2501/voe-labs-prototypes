@@ -117,6 +117,16 @@ class ServerTests(unittest.TestCase):
             self.call("POST","/api/v1/conversations",{"message":"topic","research":True},admin)
             web.assert_called_with(query='topic')
             self.assertEqual(self.call("POST","/api/v1/conversations",{"message":"topic","research":"yes"},admin)[0],400)
+            web.reset_mock()
+            query = "Quais são as notícias de tecnologia de hoje?"
+            status, answer = self.call("POST", "/api/v1/conversations", {"message":query}, admin)
+            self.assertEqual(status, 200)
+            self.assertEqual(answer['tool'], 'web_research')
+            web.assert_called_once()
+            web.reset_mock()
+            status, _ = self.call("POST", "/api/v1/conversations", {"message":query,"auto_research":False}, admin)
+            self.assertEqual(status, 200)
+            web.assert_not_called()
         status,schema=self.call('GET','/api/v1/openapi.json',token=admin)
         self.assertIn('/research',schema['paths'])
 

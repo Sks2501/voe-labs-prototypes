@@ -11,9 +11,12 @@ import socket
 import ssl
 import threading
 import time
+import unicodedata
 import xml.etree.ElementTree as ET
 from urllib.parse import parse_qs, quote_plus, urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
+from .hardware import is_hardware_request
+from .temperatures import is_temperature_request
 
 AGENT = "SextaFeiraResearch/1.0"
 MAX_BYTES = 524288
@@ -302,13 +305,56 @@ def relevant_excerpt(text, query, limit=900):
     return max(windows, key=score)[:limit]
 
 
-def research_request(message):
-    """Only user requests or an explicit UI option select outbound research."""
-    match = re.match(r"^/(pesquisar|pesquisa|buscar|site|ler)\s+(.+)$", message.strip(), re.I | re.S)
+def research_request(message, *, auto=True):
+    """Route explicit reads/searches, or bounded current public questions.
+
+    Call with auto=False for explicit-only mode. This function must receive only
+    the current user message; it never consults history, profile or memories.
+    Local deterministic commands always remain with the local tool router.
+    """
+    if not isinstance(message,str):
+        return None
+    message = message.strip()
+    explicit = re.sub(r"^(?:(?:amig[oa]|sexta[ -]feira|oi|olá|ola)[,! ]+)","",message,flags=re.I).strip()
+    match = re.match(r"^/(pesquisar|pesquisa|buscar|site|ler)\s+(.+)$", explicit, re.I | re.S)
     if match:
         return {"url" if match[1].lower() in ("site", "ler") else "query": match[2].strip()}
-    match = re.match(r"^(?:por favor[, ]+)?(?:pesquise|pesquisa|busque|procure)(?:\s+na\s+(?:web|internet))?\s+(.+)$",message.strip(),re.I | re.S)
-    return {"query": match[1].strip()} if match else None
+    match = re.match(r"^(?:por favor[, ]+)?(?:leia|ler)\s+(?:(?:este|esse|esta|essa|o|a)\s+)?(?:site|página|pagina|link)\s*:\s*(\S+)\s*$",explicit,re.I)
+    if match:
+        return {"url":match[1]}
+    match = re.match(r"^(?:por favor[, ]+)?(?:pesquise|pesquisa|busque|procure)(?:\s+na\s+(?:web|internet))?\s+(.+)$",explicit,re.I | re.S)
+    if match:
+        return {"query":match[1].strip()}
+    if auto is not True or not 2 <= len(message) <= 320 or message.startswith("/"):
+        return None
+    if is_hardware_request(message) or is_temperature_request(message):
+        return None
+    text = "".join(char for char in unicodedata.normalize("NFKD",explicit.casefold()) if not unicodedata.combining(char))
+    # Automatic mode must not transmit personal context, identifiers, local
+    # files/URLs, private tasks, credentials or source code to a search provider.
+    if re.search(r"https?://|www\.|[a-z]:[\\/]|\\\\|```|(?:^|\s)/(?:home|etc|var|root|usr|data|mnt|tmp|users)\b",text):
+        return None
+    if re.search(r"\b(eu|meu|minha|meus|minhas|nosso|nossa|nossos|nossas|sou|estou|sinto|senha|senhas|token|tokens|credencial|credenciais|cpf|cnpj|passaporte|cep|endereco|telefone|whatsapp|email|contato|bancaria|saldo|rua|avenida|bairro)\b",text):
+        return None
+    if re.search(r"\b(tarefas?|lembretes?|memorias?|preferencias?|perfil|compromissos?|calendario|agenda|historico)\b|\.env\b|access\.token|config\.json|memory\.sqlite",text):
+        return None
+    if re.search(r"\b(horas?|relogio|dia da semana)\b|\bdata\b.*\b(hoje|atual|servidor|sistema)\b|\bque dia e hoje\b",text):
+        return None
+    if re.search(r"\b(api|servidor|vps|maquina|computador|pc|cpu|ram|disco|hardware|processador|memoria|ssd|gpu)\b",text) and re.search(r"\b(estado|status|funcionando|funciona|disponivel|uso|carga|temperatura|temperaturas|como esta|como estao)\b",text):
+        return None
+    code_topic = r"\b(codigo|script|funcao|programa|aplicativo|software|painel|comando|query|api|sql|regex|python|javascript|powershell|java|html|css)\b"
+    creation = r"\b(crie|cria|criar|crio|escreva|escreve|gere|gera|gerar|implemente|implementar|corrija|corrige|corrigir|depure|otimize|compile|execute|rode|desenvolva|programe)\b"
+    if re.search(code_topic,text) and (re.search(creation,text) or re.search(r"\bcomo (?:faco|fazer|usar|programar|corrigir)\b",text)):
+        return None
+    if re.search(r"\b(frase|poema|piada|conto|conversar|motivacao|tudo bem|bom dia|boa noite)\b",text):
+        return None
+    try:
+        query = research_query(message)
+    except ValueError:
+        return None
+    lookup = re.match(r"^(?:(?:por favor)[, ]+)?(?:qual|quais|quanto|quanta|quantos|quantas|quem|quando|onde|que|o que|como|a quanto|me (?:diga|conte|mostre|fala|fale|informe)|diga|mostre|fale|informe|quero saber|resuma|previsao|noticias|cotacao|preco|clima|tempo|resultado|placar|ultimas noticias)\b",text)
+    current = re.search(r"\b(hoje|agora|ontem|amanha|atual|atuais|atualmente|atualizada|atualizado|atualizacoes|recentes?|recentemente|ultima|ultimas|ultimo|ultimos|novidades?|noticias?|cotacao|precos?|lancamentos?|placar|previsao|clima|melhor(?:es)?|recomenda|recomendacao|habitantes|populacao|populoso|presidente|governador|prefeito|ceo|ministro|campeao|vencedor|versao|feriados?)\b|\bvale a pena\b",text)
+    return {"query":query} if lookup and current else None
 
 
 def research_query(query):

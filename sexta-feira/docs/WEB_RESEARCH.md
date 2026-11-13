@@ -1,6 +1,6 @@
 # Pesquisa pessoal na web
 
-A SEXTA-FEIRA pode consultar fontes públicas a pedido do proprietário. Use **+ → Pesquisar na web** para a próxima pergunta, `/pesquisar assunto`, “pesquise assunto” ou `/site https://endereco-publico/`. O modo volta a desativado depois de uma resposta bem-sucedida. Conversas comuns permanecem locais.
+O modo automático reconhece perguntas públicas que dependem de informações recentes e consulta fontes. Você pode escolher pesquisa ligada ou desligada no chat. Pedidos explícitos como “pesquise notícias sobre ciclismo” e “leia este site: https://sqlite.org/” também funcionam. Digitar uma barra no início da mensagem abre os atalhos disponíveis.
 
 O leitor de RSS exibe resultados públicos do Bing para uso pessoal e não comercial de um único proprietário. O feed fornece títulos e links; suas descrições não entram no modelo. As páginas das editoras são buscadas separadamente, respeitando robots.txt, e somente seus trechos lidos podem fundamentar uma síntese local. A fonte é marcada como **Página lida** ou **página não lida**. Não publique esta funcionalidade como um buscador para terceiros nem reutilize o feed comercialmente. [Referência oficial do RSS](https://blogs.bing.com/search/2005/1/RSS-Feeds-for-Search-Results/).
 
